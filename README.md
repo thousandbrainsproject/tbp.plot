@@ -1,41 +1,51 @@
-# Python package template
+# tbp.plot
 
-This is a Python package template. For application use-cases like web servers, scripts, and command-line interfaces that require packaging and distribution, this template is suitable.
+This is a visualization tool for plotting [tbp.monty](https://github.com/thousandbrainsproject/tbp.monty) visualizations.
 
-For a Python library template, see https://github.com/thousandbrainsproject/tbp.python_library.
+- [Installation](#installation)
+- [Usage](#usage)
+- [Development](#development)
 
-To create a repository from this template, find and click the "Use this template" button:
+## Installation
 
-![Use this template](./delete_me.png)
+To use the tool, all you need to do is clone this repository. If you intend to do development on this repository, see the [Development](#development) section for the development setup.
 
-## Make it yours
+### Install `uv`
 
-After copying the template, you need to address the following TODOs.
+On a Mac, `brew install uv` is sufficient. For additional options, see the [uv installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
 
-### `pyproject.toml`
+### Install dependencies
 
-- Update the project `description`
-- Update the project `name`
-- Confirm desired Python version in `requires-python`
-- Update any entrypoints in `[project.scripts]`
-- Update the `Repository` and `Issues` URLs
+```bash
+uv sync
+```
 
-### Delete template images
+## Usage
 
-- Delete `delete_me.png`
-- Delete `delete_me_too.png`
+To run a tool:
 
-### `README.md`
+```bash
+$ uv run interactive_object_evidence_over_time -h
+usage: interactive_object_evidence_over_time [-h] [--debug] [--objects_mesh_dir OBJECTS_MESH_DIR] [-lm LEARNING_MODULE] experiment_log_dir
 
-- Update for your project
+Creates an interactive plot of object evidence and sensor visualization.
 
-### Recommendations
+positional arguments:
+  experiment_log_dir    The directory containing the experiment log with the detailed stats file.
 
-For a cleaner project commit history, go to your repository settings and in the Pull Requests section, only "Allow squash merging". It also helps to set your default commit message to the "Pull request title" option.
-
-![Pull Request Settings](./delete_me_too.png)
+options:
+  -h, --help            show this help message and exit
+  --debug               Enable debug logging
+  --objects_mesh_dir OBJECTS_MESH_DIR
+                        The directory containing the mesh objects.
+  -lm, --learning_module LEARNING_MODULE
+                        The name of the learning module (default: "LM_0").
+```
 
 ## Development
+
+> [!NOTE]
+> First, **make a fork of this repository**. Make any changes on your local fork. This repository is configured to only accept pull requests from forks.
 
 The development of this project is managed with [uv](https://docs.astral.sh/uv/), "a single tool to replace `pip`, `pip-tools`, `pipx`, `poetry`, `pyenv`, `twine`, `virtualenv`, and more." You will need to install it.
 

@@ -9,7 +9,7 @@
 
 import unittest
 
-from tbp.project import __version__
+from tbp.plot import __version__
 
 
 class VersionTest(unittest.TestCase):

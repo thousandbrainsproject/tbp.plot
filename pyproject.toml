@@ -13,16 +13,20 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
+    "pandas",
+    "torch",
+    "trimesh",
+    "vedo",
 ]
-description = "Python project template" # TODO: Update this description
+description = "A visualization tool for plotting tbp.monty visualizations."
 dynamic = ["version"]
 license = { file = "LICENSE" }
-name = "tbp.project" # TODO: Update this name
+name = "tbp.plot"
 readme = "README.md"
-requires-python = ">=3.8, <4" # TODO: Confirm desired Python version
+requires-python = ">=3.13, <4"
 
-[project.scripts] # TODO: Update with your application entrypoints, if any
-hello = "tbp.project.hello:main" # Executable via `uv run hello`
+[project.scripts]
+interactive_object_evidence_over_time = "tbp.plot.interactive_object_evidence_over_time:main"
 
 [dependency-groups]
 dev = [
@@ -42,8 +46,8 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/thousandbrainsproject/tbp.project" # TODO: Update this URL
-Issues = "https://github.com/thousandbrainsproject/tbp.project/issues" # TODO: Update this URL
+Repository = "https://github.com/thousandbrainsproject/tbp.plot"
+Issues = "https://github.com/thousandbrainsproject/tbp.plot/issues"
 
 [tool.coverage.run]
 branch = true
