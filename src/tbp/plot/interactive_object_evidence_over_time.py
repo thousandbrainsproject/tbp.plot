@@ -34,7 +34,6 @@ from tbp.plot.stats import load_stats
 from tbp.plot.ycb import DISTINCT_OBJECTS
 
 if TYPE_CHECKING:
-
     from vedo import Button, Slider2D
 
 logger = logging.getLogger(__name__)
@@ -142,7 +141,9 @@ class DataExtractor:
             # to extract the processed steps only.
             processed_steps = episode_data[self.lm]["lm_processed_steps"]
             for processed_step, seq_step in zip(
-                processed_steps, episode_data["motor_system"]["action_sequence"]
+                processed_steps,
+                episode_data["motor_system"]["action_sequence"],
+                strict=True,
             ):
                 if processed_step:
                     self.sensor_positions.append(seq_step[1]["agent_id_0"]["position"])
@@ -454,7 +455,9 @@ class EvidencePlot:
 
         # Create background rectangles and labels
         prev_x = 0
-        for obj, x in zip(self.primary_target_objects, self.target_transitions):
+        for obj, x in zip(
+            self.primary_target_objects, self.target_transitions, strict=True
+        ):
             color = colors.get(obj, (0.7, 0.7, 0.7))
             x_start = prev_x
             x_end = prev_x + x
@@ -504,24 +507,24 @@ class EvidencePlot:
         """
         total_steps = sum(self.target_transitions)
 
-        return dict(
-            xtitle="Timesteps",
-            xtitle_position=0.6,
-            xtitle_offset=0.1,
-            ytitle="Evidence Score",
-            ytitle_position=0.85,
-            ytitle_offset=0.03,
-            yminor_ticks=1,
-            xrange=(0, total_steps),
-            yrange=(0, 80),
-            zrange=(0, 0),
-            xygrid=True,
-            yzgrid=False,
-            zxgrid=False,
-            htitle="Evidence Scores Over Time with Resampling",
-            htitle_offset=(0.1, 0.1, 0),
-            number_of_divisions=10,
-        )
+        return {
+            "xtitle": "Timesteps",
+            "xtitle_position": 0.6,
+            "xtitle_offset": 0.1,
+            "ytitle": "Evidence Score",
+            "ytitle_position": 0.85,
+            "ytitle_offset": 0.03,
+            "yminor_ticks": 1,
+            "xrange": (0, total_steps),
+            "yrange": (0, 80),
+            "zrange": (0, 0),
+            "xygrid": True,
+            "yzgrid": False,
+            "zxgrid": False,
+            "htitle": "Evidence Scores Over Time with Resampling",
+            "htitle_offset": (0.1, 0.1, 0),
+            "number_of_divisions": 10,
+        }
 
     def __call__(self, plotter: Plotter, step: int = 0) -> None:
         """Render evidence lines, background labels, and guide line.
@@ -717,6 +720,7 @@ def plot_interactive_objects_evidence_over_time(
     plot.render(resetcam=True)
 
     return 0
+
 
 def main():
     parser = argparse.ArgumentParser(
