@@ -9,14 +9,14 @@
 
 import unittest
 
-from tbp.plot.interactive_object_evidence_over_time import (
-    plot_interactive_objects_evidence_over_time,
+from tbp.plot.plots.interactive_objects_evidence_over_time import (
+    main as interactive_plot,
 )
 
 
 class TestInteractiveObjectsEvidenceOverTime(unittest.TestCase):
     def test_exit_1_if_exp_path_does_not_exist(self):
-        exit_code = plot_interactive_objects_evidence_over_time(
+        exit_code = interactive_plot(
             "nonexistent_exp_path", "nonexistent_data_path", "LM_0"
         )
         self.assertEqual(exit_code, 1)
