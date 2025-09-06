@@ -76,17 +76,17 @@ def attach_args(name: str):
 
     Returns:
         A decorator that registers the given function as the
-        ``add_arguments`` handler for the specified plot.
+        `add_arguments` handler for the specified plot.
     """
 
     def _wrap(adder: ArgAdder):
-        """Attach the ``adder`` to the already-registered plot.
+        """Attach the `adder` to the already-registered plot.
 
         Raises:
-            RuntimeError: If the plot ``name`` has not been registered.
+            RuntimeError: If the plot `name` has not been registered.
 
         Returns:
-            ArgAdder: The same ``adder`` function, unchanged.
+            ArgAdder: The same `adder` function, unchanged.
         """
         if name not in _REGISTRY:
             raise RuntimeError(
@@ -116,13 +116,13 @@ def get(name: str) -> PlotSpec:
 
     Raises:
         KeyError: If the plot name is not registered. The message suggests
-        running ``tbp-plot`` to list available plots.
+        running `plot` to list available plots.
     """
     try:
         return _REGISTRY[name]
     except KeyError as e:
         raise KeyError(
-            f"Unknown plot '{name}'. Use `tbp-plot` to list available plots."
+            f"Unknown plot '{name}'. Use `plot` to list available plots."
         ) from e
 
 

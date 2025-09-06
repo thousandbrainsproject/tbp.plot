@@ -11,7 +11,7 @@
 
 This module discovers available plot modules, lists them, and provides
 entry points for running specific plots with their plot-specific
-arguments. It is defined as the `tbp-plot` project script in `pyproject.toml`.
+arguments. It is defined as the `plot` project script in `pyproject.toml`.
 """
 
 import argparse
@@ -56,7 +56,7 @@ def _build_plot_parser(spec: PlotSpec) -> argparse.ArgumentParser:
         Parser configured with this plot's arguments.
     """
     p = argparse.ArgumentParser(
-        prog=f"tbp-plot {spec.name}",
+        prog=f"plot {spec.name}",
         description=f"Arguments for plot '{spec.name}'",
         add_help=True,
     )
@@ -67,7 +67,7 @@ def _build_plot_parser(spec: PlotSpec) -> argparse.ArgumentParser:
 
 
 def main() -> int:
-    """Entry point for the `tbp-plot` command-line tool.
+    """Entry point for the `plot` command-line tool.
 
     This function imports all plot modules to populate the registry,
     then runs specific plots based on user input:
@@ -91,7 +91,7 @@ def main() -> int:
 
     # Display the help menu if requested
     if not argv or argv[0] in ("-h", "--help"):
-        p = argparse.ArgumentParser(prog="tbp-plot", add_help=False)
+        p = argparse.ArgumentParser(prog="plot", add_help=False)
         p.description = (
             "TBP plotting CLI. Run a plot by name, or call with no args to list."
         )

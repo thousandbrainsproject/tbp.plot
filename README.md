@@ -45,7 +45,7 @@ For a list of plot-specific args, use the help menu with:
 ```bash
 $ uv run plot interactive_objects_evidence_over_time [-h|--help]
 
-usage: tbp-plot interactive_objects_evidence_over_time [-h] [--objects_mesh_dir OBJECTS_MESH_DIR] [-lm LEARNING_MODULE] experiment_log_dir
+usage: plot interactive_objects_evidence_over_time [-h] [--objects_mesh_dir OBJECTS_MESH_DIR] [-lm LEARNING_MODULE] experiment_log_dir
 
 Arguments for plot 'interactive_objects_evidence_over_time'
 
