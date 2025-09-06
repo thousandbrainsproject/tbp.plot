@@ -94,7 +94,6 @@ def main(arg1: str, arg2: int) -> int:
 def add_arguments(p: argparse.ArgumentParser) -> None:
     p.add_argument("--arg1", required=True, help="The first argument.")
     p.add_argument("--arg2", type=int, default=100, help="The second argument.")
-
 ```
 
 Once you add this file, it will be auto-discovered.
@@ -107,6 +106,8 @@ Available plots:
   interactive_objects_evidence_over_time: Interactive visualization for objects, MLH and sensor locations
   my_new_plot                           : Example of a new plot
 
+$ uv run plot my_new_plot --arg1 "test" --arg2 50
+Running my_new_plot with arg1=test and arg2=50
 ```
 
 ### Running Development Tools
