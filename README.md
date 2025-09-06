@@ -12,7 +12,7 @@ To use the tool, all you need to do is clone this repository. If you intend to d
 
 ### Install `uv`
 
-On a Mac, `brew install uv` is sufficient. For additional options, see the [uv installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
+On a Mac, `brew install uv` is sufficient. For other platforms, see the [uv installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
 
 ### Install dependencies
 
@@ -20,27 +20,47 @@ On a Mac, `brew install uv` is sufficient. For additional options, see the [uv i
 uv sync
 ```
 
+This creates a virtual environment in `.venv/` and installs package dependencies as well as the `plot` console script.
+
 ## Usage
 
-To run a tool:
+After installation you can run the following command to list all available plots:
 
 ```bash
-$ uv run interactive_object_evidence_over_time -h
-usage: interactive_object_evidence_over_time [-h] [--debug] [--objects_mesh_dir OBJECTS_MESH_DIR] [-lm LEARNING_MODULE] experiment_log_dir
+$ uv run plot
 
-Creates an interactive plot of object evidence and sensor visualization.
+Available plots:
+
+  interactive_objects_evidence_over_time: Interactive visualization for objects, MLH and sensor locations
+```
+
+To run one of the available plots, run:
+
+```bash
+$ uv run plot interactive_objects_evidence_over_time [args]
+```
+
+For a list of plot-specific args, use the help menu with:
+
+```bash
+$ uv run plot interactive_objects_evidence_over_time [-h|--help]
+
+usage: tbp-plot interactive_objects_evidence_over_time [-h] [--objects_mesh_dir OBJECTS_MESH_DIR] [-lm LEARNING_MODULE] experiment_log_dir
+
+Arguments for plot 'interactive_objects_evidence_over_time'
 
 positional arguments:
   experiment_log_dir    The directory containing the experiment log with the detailed stats file.
 
 options:
   -h, --help            show this help message and exit
-  --debug               Enable debug logging
   --objects_mesh_dir OBJECTS_MESH_DIR
                         The directory containing the mesh objects.
   -lm, --learning_module LEARNING_MODULE
                         The name of the learning module (default: "LM_0").
+
 ```
+
 
 ## Development
 
@@ -53,48 +73,57 @@ We use `uv` as it tracks the latest PEP standards while relying on existing infr
 
 `uv.lock` is non-standard in Python, but as Python does not yet define a lockfile standard, any lockfile format is non-standard. The benefit of `uv.lock` is that it is cross-platform and "captures the packages that would be installed across all possible Python markers such as operating system, architecture, and Python version". This makes it safe to check-in to the repository.
 
-### Install `uv`
+### Adding new plots
 
-On a Mac, `brew install uv` is sufficient. For additional options, see the [uv installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
+Plots live under `src/tbp/plot/plots`. Each plot module defines two things:
+1. **A main function** decorated with `@register`, which is the plot entry point.
+2. **An optional add_arguments function** decorated with `@attach_args`, which defines the plot's CLI argparse arguments.
 
-### Install dependencies
+```python
+# src/tbp/plot/plots/my_new_plot.py
+import argparse
+from tbp.plot.registry import register, attach_args
 
-```bash
-uv sync
+@register("my_new_plot", description="Example of a new plot")
+def main(arg1: str, arg2: int) -> int:
+    print(f"Running my_new_plot with arg1={arg1} and arg2={arg2}")
+    # your plotting logic here...
+    return 0
+
+@attach_args("my_new_plot")
+def add_arguments(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--arg1", required=True, help="The first argument.")
+    p.add_argument("--arg2", type=int, default=100, help="The second argument.")
+
 ```
 
-### Run formatter
+Once you add this file, it will be auto-discovered.
 
 ```bash
-uv run ruff format
+$ uv run plot
+
+Available plots:
+
+  interactive_objects_evidence_over_time: Interactive visualization for objects, MLH and sensor locations
+  my_new_plot                           : Example of a new plot
+
 ```
 
-### Run style checks
+### Running Development Tools
+
+All development tools can be run through `uv run`:
 
 ```bash
-uv run ruff check
+uv run ruff check        # lint & style
+uv run ruff format       # auto-format
+uv run deptry src tests  # dependency checks
+uv run mypy              # type checks
+uv run pytest            # run tests
 ```
 
-### Run dependency checks
-
-```bash
-uv run deptry src tests
-```
-
-### Run static type checks
-
-```bash
-uv run mypy
-```
-
-### Run tests
-
-```bash
-uv run pytest
-```
-
-### Build package
+To build the package:
 
 ```bash
 uv build
 ```
+

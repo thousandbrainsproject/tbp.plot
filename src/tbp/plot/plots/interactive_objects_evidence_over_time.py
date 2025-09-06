@@ -9,9 +9,7 @@
 
 from __future__ import annotations
 
-import argparse
 import logging
-import sys
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -30,10 +28,12 @@ from vedo import (
     settings,
 )
 
-from tbp.plot.stats import load_stats
-from tbp.plot.ycb import DISTINCT_OBJECTS
+from tbp.plot.plots.stats import deserialize_json_chunks
+from tbp.plot.registry import attach_args, register
 
 if TYPE_CHECKING:
+    import argparse
+
     from vedo import Button, Slider2D
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,22 @@ logger = logging.getLogger(__name__)
 settings.immediate_rendering = False
 settings.default_font = "Theemim"
 settings.window_splitting_position = 0.5
+
+
+# NOTE: Copied from tbp.monty.frameworks.environments.ycb.py.
+# 10 objects that have little similarities in morphology.
+DISTINCT_OBJECTS = [
+    "mug",
+    "bowl",
+    "potted_meat_can",
+    "spoon",
+    "strawberry",
+    "mustard_bottle",
+    "dice",
+    "golf_ball",
+    "c_lego_duplo",
+    "banana",
+]
 
 
 class DataExtractor:
@@ -81,7 +97,8 @@ class DataExtractor:
         self.import_objects()
 
     def extract_data(self) -> None:
-        _, _, detailed_stats, _ = load_stats(self.exp_path, False, False, True, False)
+        json_file = Path(self.exp_path) / "detailed_run_stats.json"
+        detailed_stats = deserialize_json_chunks(json_file)
 
         # Initialize the lists for tracking experiment states across time steps
         self.target_names: list[str] = []
@@ -691,11 +708,11 @@ class InteractivePlot:
         )
 
 
-def plot_interactive_objects_evidence_over_time(
-    exp_path: str,
-    data_path: str,
-    learning_module: str,
-) -> int:
+@register(
+    name="interactive_objects_evidence_over_time",
+    description="Interactive visualization for objects, MLH and sensor locations",
+)
+def main(experiment_log_dir: str, objects_mesh_dir: str, learning_module: str) -> int:
     """Interactive visualization for unsupervised inference experiments.
 
     This visualization provides a 3-pane renderers to allow for inspecting the objects,
@@ -703,75 +720,42 @@ def plot_interactive_objects_evidence_over_time(
     each object.
 
     Args:
-        exp_path: Path to the experiment directory containing the detailed stats file.
-        data_path: Path to the root directory of YCB object meshes.
+        experiment_log_dir: Path to the experiment directory containing the detailed
+            stats file.
+        objects_mesh_dir: Path to the root directory of YCB object meshes.
         learning_module: The learning module to use for extracting evidence data.
 
     Returns:
         Exit code.
     """
-    if not Path(exp_path).exists():
-        logger.error(f"Experiment path not found: {exp_path}")
+    if not Path(experiment_log_dir).exists():
+        logger.error(f"Experiment path not found: {experiment_log_dir}")
         return 1
 
-    data_path = str(Path(data_path).expanduser())
+    data_path = str(Path(objects_mesh_dir).expanduser())
 
-    plot = InteractivePlot(exp_path, data_path, learning_module)
+    plot = InteractivePlot(experiment_log_dir, data_path, learning_module)
     plot.render(resetcam=True)
 
     return 0
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Creates an interactive plot of object evidence and sensor "
-        "visualization.",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable debug logging",
-        dest="debug",
-    )
-    parser.add_argument(
+@attach_args("interactive_objects_evidence_over_time")
+def add_arguments(p: argparse.ArgumentParser) -> None:
+    p.add_argument(
         "experiment_log_dir",
         help=(
             "The directory containing the experiment log with the detailed stats file."
         ),
     )
-    parser.add_argument(
+    p.add_argument(
         "--objects_mesh_dir",
         default="~/tbp/data/habitat/objects/ycb/meshes",
         help=("The directory containing the mesh objects."),
     )
-    parser.add_argument(
+    p.add_argument(
         "-lm",
         "--learning_module",
         default="LM_0",
         help='The name of the learning module (default: "LM_0").',
     )
-    parser.set_defaults(
-        func=lambda args: sys.exit(
-            plot_interactive_objects_evidence_over_time(
-                args.experiment_log_dir, args.objects_mesh_dir, args.learning_module
-            )
-        )
-    )
-
-    args = parser.parse_args()
-
-    log_level = logging.DEBUG if args.debug else logging.INFO
-    handler = logging.StreamHandler(sys.stderr)
-    logging.basicConfig(
-        level=log_level,
-        handlers=[handler],
-    )
-    logger = logging.getLogger(__name__)
-    if args.debug:
-        logger.debug("Debug logging enabled")
-
-    if hasattr(args, "func"):
-        args.func(args)
-    else:
-        parser.print_help()
-        sys.exit(1)
