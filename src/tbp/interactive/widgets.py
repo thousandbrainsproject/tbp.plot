@@ -14,10 +14,10 @@ from typing import Any, Generic
 from pubsub.core import Publisher
 from vedo import Button, Slider2D
 
-from tools.plot.interactive.generics import S, W
-from tools.plot.interactive.topics import TopicMessage
-from tools.plot.interactive.utils import VtkDebounceScheduler
-from tools.plot.interactive.widget_ops import (
+from tbp.interactive.generics import S, W
+from tbp.interactive.topics import TopicMessage
+from tbp.interactive.utils import VtkDebounceScheduler
+from tbp.interactive.widget_ops import (
     HasStateToMessages,
     HasUpdaters,
     SupportsAdd,

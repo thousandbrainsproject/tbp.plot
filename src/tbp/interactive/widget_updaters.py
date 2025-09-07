@@ -9,10 +9,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Iterable, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from tools.plot.interactive.generics import W
-from tools.plot.interactive.topics import TopicMessage, TopicSpec
+from tbp.interactive.generics import W
+from tbp.interactive.topics import TopicMessage, TopicSpec
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
 
 
 @runtime_checkable

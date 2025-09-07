@@ -8,11 +8,14 @@
 # https://opensource.org/licenses/MIT.
 from __future__ import annotations
 
-from typing import Callable, Iterable, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from tools.plot.interactive.generics import S, W
-from tools.plot.interactive.topics import TopicMessage
-from tools.plot.interactive.widget_updaters import WidgetUpdaterProto
+from tbp.interactive.generics import S, W
+from tbp.interactive.topics import TopicMessage
+from tbp.interactive.widget_updaters import WidgetUpdaterProto
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
 
 
 @runtime_checkable

@@ -12,13 +12,13 @@ import os
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, List, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 import trimesh
 from vedo import Mesh
 
-from tbp.monty.frameworks.utils.logging_utils import deserialize_json_chunks
+from tbp.plot.plots.stats import deserialize_json_chunks
 
 if TYPE_CHECKING:
     from os import PathLike
@@ -222,7 +222,7 @@ class DataLocator:
         path: Ordered list of steps describing how to reach a target value.
     """
 
-    path: List[DataLocatorStep]
+    path: list[DataLocatorStep]
 
     def missing_steps(self) -> list[DataLocatorStep]:
         """Return steps that do not have values.
