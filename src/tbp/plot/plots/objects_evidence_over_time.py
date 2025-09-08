@@ -26,7 +26,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-sns.set_theme(style="darkgrid")
 
 # NOTE: Copied from tbp.monty.frameworks.environments.ycb.py.
 # 10 objects that have little similarities in morphology.
@@ -65,6 +64,9 @@ def main(experiment_log_dir: str) -> int:
     if not Path(experiment_log_dir).exists():
         logger.error(f"Experiment path not found: {experiment_log_dir}")
         return 1
+
+    # seaborn darkgrid style
+    sns.set_theme(style="darkgrid")
 
     # load detailed stats
     json_file = Path(experiment_log_dir) / "detailed_run_stats.json"

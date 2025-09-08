@@ -25,7 +25,6 @@ from tbp.plot.registry import attach_args, register
 if TYPE_CHECKING:
     import argparse
 
-sns.set_theme(style="darkgrid")
 logger = logging.getLogger(__name__)
 
 
@@ -55,6 +54,9 @@ def main(experiment_log_dir: str) -> int:
     if not Path(experiment_log_dir).exists():
         logger.error(f"Experiment path not found: {experiment_log_dir}")
         return 1
+
+    # seaborn darkgrid style
+    sns.set_theme(style="darkgrid")
 
     # load detailed stats
     json_file = Path(experiment_log_dir) / "detailed_run_stats.json"
