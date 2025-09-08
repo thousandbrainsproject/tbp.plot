@@ -13,6 +13,8 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
+    "matplotlib",
+    "seaborn",
     "pandas",
     "torch",
     "trimesh",
@@ -26,7 +28,7 @@ readme = "README.md"
 requires-python = ">=3.13, <4"
 
 [project.scripts]
-interactive_object_evidence_over_time = "tbp.plot.interactive_object_evidence_over_time:main"
+plot = "tbp.plot.cli:main"
 
 [dependency-groups]
 dev = [

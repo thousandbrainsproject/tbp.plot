@@ -16,77 +16,8 @@ NOTE: Copied from tbp.monty.frameworks.utils.logging_utils.py.
 from __future__ import annotations
 
 import json
-import logging
-import os
 
 import numpy as np
-import pandas as pd
-import torch
-
-logger = logging.getLogger(__name__)
-
-
-def load_stats(
-    exp_path,
-    load_train=True,
-    load_eval=True,
-    load_detailed=True,
-    load_models=True,
-    pretrained_dict=None,
-):
-    """Load experiment statistics from an experiment for analysis.
-
-    Returns:
-        train_stats: pandas DataFrame with training statistics
-        eval_stats: pandas DataFrame with evaluation statistics
-        detailed_stats: dict with detailed statistics
-        lm_models: dict with loaded language models
-    """
-    train_stats, eval_stats, detailed_stats, lm_models = None, None, None, None
-    if load_train:
-        print("...loading and checking train statistics...")
-        train_stats = pd.read_csv(os.path.join(exp_path, "train_stats.csv"))
-
-    if load_eval:
-        print("...loading and checking eval statistics...")
-        eval_stats = pd.read_csv(os.path.join(exp_path, "eval_stats.csv"))
-
-    if load_detailed:
-        print("...loading detailed run statistics...")
-        json_file = os.path.join(exp_path, "detailed_run_stats.json")
-        try:
-            with open(json_file, "r") as f:
-                detailed_stats = json.load(f)
-        except ValueError:
-            detailed_stats = deserialize_json_chunks(json_file)
-        f.close()
-
-    if load_models:
-        print("...loading LM models...")
-        lm_models = load_models_from_dir(exp_path, pretrained_dict)
-
-    return train_stats, eval_stats, detailed_stats, lm_models
-
-
-def load_models_from_dir(exp_path, pretrained_dict=None):
-    lm_models = {}
-
-    if pretrained_dict is not None:
-        lm_models["pretrained"] = {}
-        state_dict = torch.load(os.path.join(pretrained_dict, "model.pt"))
-        for lm_id in list(state_dict["lm_dict"].keys()):
-            pretrained_models = state_dict["lm_dict"][lm_id]["graph_memory"]
-            lm_models["pretrained"][lm_id] = pretrained_models
-
-    for folder in os.listdir(exp_path):
-        if folder.isnumeric():
-            state_dict = torch.load(os.path.join(exp_path, folder, "model.pt"))
-            for lm_id in list(state_dict["lm_dict"].keys()):
-                epoch_models = state_dict["lm_dict"][lm_id]["graph_memory"]
-                if folder not in lm_models.keys():
-                    lm_models[folder] = {}
-                lm_models[folder]["LM_" + str(lm_id)] = epoch_models
-    return lm_models
 
 
 def deserialize_json_chunks(json_file, start=0, stop=None, episodes=None):
