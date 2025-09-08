@@ -37,9 +37,9 @@ dev = [
     "mypy==1.11.2",
 
     # Testing, code style, etc...
-    "pytest==7.1.1",
-    "pytest-xdist==2.5.0",
-    "pytest-cov==3.0.0",
+    "pytest>=8.0,<9",
+    "pytest-xdist>=3.6.1,<4",
+    "pytest-cov>=6.0,<7",
 
     # Python linter and formatter
     "ruff==0.7.1",
