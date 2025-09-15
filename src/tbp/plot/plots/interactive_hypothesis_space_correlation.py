@@ -21,7 +21,7 @@ import pandas as pd
 import seaborn as sns
 from pandas import DataFrame, Series
 from pubsub.core import Publisher
-from vedo import Button, Circle, Image, Mesh, Plotter, Slider2D, Text2D
+from vedo import Button, Circle, Image, Line, Mesh, Plotter, Slider2D, Sphere, Text2D
 
 from tbp.interactive.data import (
     DataLocator,
@@ -338,9 +338,19 @@ class GtMeshWidgetOps:
             WidgetUpdater(
                 topics=[TopicSpec("episode_number", required=True)],
                 callback=self.update_mesh,
-            )
+            ),
+            WidgetUpdater(
+                topics=[
+                    TopicSpec("episode_number", required=True),
+                    TopicSpec("step_number", required=True),
+                ],
+                callback=self.update_sensor,
+            ),
         ]
         self._locators = self.create_locators()
+
+        self.gaze_line: Line | None = None
+        self.sensor_circle: Circle | None = None
 
         self.plotter.at(1).add(Text2D(txt="Ground Truth", pos="top-center"))
 
@@ -357,6 +367,37 @@ class GtMeshWidgetOps:
                 DataLocatorStep.key(name="lm", value="target"),
             ]
         )
+
+        locators["steps_mask"] = DataLocator(
+            path=[
+                DataLocatorStep.key(name="episode"),
+                DataLocatorStep.key(name="system", value="LM_0"),
+                DataLocatorStep.key(name="telemetry", value="lm_processed_steps"),
+            ]
+        )
+
+        locators["sensor_location"] = DataLocator(
+            path=[
+                DataLocatorStep.key(name="episode"),
+                DataLocatorStep.key(name="system", value="motor_system"),
+                DataLocatorStep.key(name="telemetry", value="action_sequence"),
+                DataLocatorStep.index(name="sm_step"),
+                DataLocatorStep.index(name="telemetry_type", value=1),
+                DataLocatorStep.key(name="agent", value="agent_id_0"),
+                DataLocatorStep.key(name="pose", value="position"),
+            ]
+        )
+
+        locators["patch_location"] = DataLocator(
+            path=[
+                DataLocatorStep.key(name="episode"),
+                DataLocatorStep.key(name="system", value="LM_0"),
+                DataLocatorStep.key(name="telemetry", value="locations"),
+                DataLocatorStep.key(name="sm", value="patch"),
+                DataLocatorStep.index(name="step"),
+            ]
+        )
+
         return locators
 
     def remove(self, widget: Mesh) -> None:
@@ -401,6 +442,44 @@ class GtMeshWidgetOps:
         widget.shift(*target_pos)
 
         self.plotter.at(1).add(widget)
+        self.plotter.at(1).render()
+
+        return widget, False
+
+    def update_sensor(
+        self, widget: None, msgs: list[TopicMessage]
+    ) -> tuple[None, bool]:
+        msgs_dict = {msg.name: msg.value for msg in msgs}
+        episode_number = msgs_dict["episode_number"]
+        step_number = msgs_dict["step_number"]
+
+        steps_mask = self.data_parser.extract(
+            self._locators["steps_mask"], episode=str(episode_number)
+        )
+        mapping = np.flatnonzero(steps_mask)
+
+        sensor_pos = self.data_parser.extract(
+            self._locators["sensor_location"],
+            episode=str(episode_number),
+            sm_step=int(mapping[step_number]),
+        )
+
+        patch_pos = self.data_parser.extract(
+            self._locators["patch_location"],
+            episode=str(episode_number),
+            step=step_number,
+        )
+
+        if self.sensor_circle is None:
+            self.sensor_circle = Sphere(pos=sensor_pos, r=0.002)
+            self.plotter.at(1).add(self.sensor_circle)
+        self.sensor_circle.pos(sensor_pos)
+
+        if self.gaze_line is None:
+            self.gaze_line = Line(sensor_pos, patch_pos, c="black", lw=2)
+            self.plotter.at(1).add(self.gaze_line)
+        self.gaze_line.points = [sensor_pos, patch_pos]
+
         self.plotter.at(1).render()
 
         return widget, False
@@ -873,6 +952,14 @@ class ClickWidgetOps:
         ]
         return messages
 
+    def align_camera(self, cam_a: Any, cam_b: Any) -> None:
+        """Align the camera objects."""
+        cam_a.SetPosition(cam_b.GetPosition())
+        cam_a.SetFocalPoint(cam_b.GetFocalPoint())
+        cam_a.SetViewUp(cam_b.GetViewUp())
+        cam_a.SetClippingRange(cam_b.GetClippingRange())
+        cam_a.SetParallelScale(cam_b.GetParallelScale())
+
     def on_right_click(self, event) -> None:
         """Handle left mouse press (picks a 3D point if available).
 
@@ -892,14 +979,23 @@ class ClickWidgetOps:
         Notes:
             Bound to the "RightButtonPress" event in `self.add()`.
         """
-        renderer = self.plotter.at(0).renderer
-        if renderer is not None:
-            cam = renderer.GetActiveCamera()
-            cam.SetPosition(self.cam_dict["pos"])
-            cam.SetFocalPoint(self.cam_dict["focal_point"])
-            cam.SetViewUp((0, 1, 0))
-            cam.SetClippingRange((0.01, 1000.01))
-            self.plotter.at(0).render()
+        if event.at == 0:
+            renderer = self.plotter.at(0).renderer
+            if renderer is not None:
+                cam = renderer.GetActiveCamera()
+                cam.SetPosition(self.cam_dict["pos"])
+                cam.SetFocalPoint(self.cam_dict["focal_point"])
+                cam.SetViewUp((0, 1, 0))
+                cam.SetClippingRange((0.01, 1000.01))
+                self.plotter.at(0).render()
+        elif event.at == 1:
+            cam_clicked = self.plotter.renderers[1].GetActiveCamera()
+            cam_copy = self.plotter.renderers[2].GetActiveCamera()
+            self.align_camera(cam_copy, cam_clicked)
+        elif event.at == 2:
+            cam_clicked = self.plotter.renderers[1].GetActiveCamera()
+            cam_copy = self.plotter.renderers[2].GetActiveCamera()
+            self.align_camera(cam_clicked, cam_copy)
 
 
 class CorrelationPlotWidgetOps:
@@ -2176,13 +2272,20 @@ class InteractivePlot:
         self._widgets["age_threshold"].set_state(0)
 
         self.plotter.at(0).show(
-            camera=deepcopy(self.cam_dict), interactive=False, resetcam=False
+            camera=deepcopy(self.cam_dict),
+            interactive=False,
+            resetcam=False,
         )
         self.plotter.at(1).show(
-            axes=deepcopy(self.axes_dict), interactive=False, resetcam=True
+            axes=deepcopy(self.axes_dict),
+            interactive=False,
+            resetcam=True,
         )
+
         self.plotter.at(2).show(
-            axes=deepcopy(self.axes_dict), interactive=True, resetcam=True
+            axes=deepcopy(self.axes_dict),
+            interactive=True,
+            resetcam=True,
         )
 
     def create_widgets(self):
