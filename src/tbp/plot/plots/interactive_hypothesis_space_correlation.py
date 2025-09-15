@@ -119,8 +119,8 @@ class EpisodeSliderWidgetOps:
         kwargs = deepcopy(self._add_kwargs)
         locator = self._locators["episode"]
         kwargs.update({"xmax": len(self.data_parser.query(locator)) - 1})
-        widget = self.plotter.add_slider(callback, **kwargs)
-        self.plotter.render()
+        widget = self.plotter.at(0).add_slider(callback, **kwargs)
+        self.plotter.at(0).render()
         return widget
 
     def remove(self, widget: Slider2D) -> None:
@@ -129,8 +129,8 @@ class EpisodeSliderWidgetOps:
         Args:
             widget: The widget object.
         """
-        self.plotter.remove(widget)
-        self.plotter.render()
+        self.plotter.at(0).remove(widget)
+        self.plotter.at(0).render()
 
     def extract_state(self, widget: Slider2D) -> int:
         """Read the current slider value from its VTK representation.
@@ -230,8 +230,8 @@ class StepSliderWidgetOps:
         Returns:
             The created `Slider2D` widget.
         """
-        widget = self.plotter.add_slider(callback, **self._add_kwargs)
-        self.plotter.render()
+        widget = self.plotter.at(0).add_slider(callback, **self._add_kwargs)
+        self.plotter.at(0).render()
         return widget
 
     def remove(self, widget: Slider2D) -> None:
@@ -240,8 +240,8 @@ class StepSliderWidgetOps:
         Args:
             widget: The slider widget object.
         """
-        self.plotter.remove(widget)
-        self.plotter.render()
+        self.plotter.at(0).remove(widget)
+        self.plotter.at(0).render()
 
     def extract_state(self, widget: Slider2D) -> int:
         """Read the current slider value.
@@ -307,7 +307,7 @@ class StepSliderWidgetOps:
 
         # set slider value back to zero
         self.set_state(widget, 0)
-        self.plotter.render()
+        self.plotter.at(0).render()
 
         return widget, True
 
@@ -342,6 +342,8 @@ class GtMeshWidgetOps:
         ]
         self._locators = self.create_locators()
 
+        self.plotter.at(1).add(Text2D(txt="Ground Truth", pos="top-center"))
+
     def create_locators(self) -> dict[str, DataLocator]:
         """Create and return data locators used by this widget.
 
@@ -364,8 +366,8 @@ class GtMeshWidgetOps:
             widget: The mesh widget to remove. If `None`, no action is taken.
         """
         if widget is not None:
-            self.plotter.remove(widget)
-            self.plotter.render()
+            self.plotter.at(1).remove(widget)
+            self.plotter.at(1).render()
 
     def update_mesh(self, widget: Mesh, msgs: list[TopicMessage]) -> tuple[Mesh, bool]:
         """Update the target mesh when the episode changes.
@@ -391,15 +393,15 @@ class GtMeshWidgetOps:
         )
         target_id = target["primary_target_object"]
         target_rot = target["primary_target_rotation_euler"]
+        target_pos = target["primary_target_position"]
         widget = self.ycb_loader.create_mesh(target_id).clone(deep=True)
         widget.rotate_x(target_rot[0])
         widget.rotate_y(target_rot[1])
         widget.rotate_z(target_rot[2])
-        widget.scale(1500)
-        widget.pos(-300, 0, -500)
+        widget.shift(*target_pos)
 
-        self.plotter.add(widget)
-        self.plotter.render()
+        self.plotter.at(1).add(widget)
+        self.plotter.at(1).render()
 
         return widget, False
 
@@ -437,8 +439,8 @@ class PrimaryButtonWidgetOps:
         Returns:
             The created `vedo.Button`.
         """
-        widget = self.plotter.add_button(callback, **self._add_kwargs)
-        self.plotter.render()
+        widget = self.plotter.at(0).add_button(callback, **self._add_kwargs)
+        self.plotter.at(0).render()
         return widget
 
     def state_to_messages(self, state: str) -> Iterable[TopicMessage]:
@@ -489,8 +491,8 @@ class PrevButtonWidgetOps:
         Returns:
             The created `vedo.Button`.
         """
-        widget = self.plotter.add_button(callback, **self._add_kwargs)
-        self.plotter.render()
+        widget = self.plotter.at(0).add_button(callback, **self._add_kwargs)
+        self.plotter.at(0).render()
         return widget
 
     def state_to_messages(self, state: str) -> Iterable[TopicMessage]:
@@ -541,8 +543,8 @@ class NextButtonWidgetOps:
         Returns:
             The created `vedo.Button`.
         """
-        widget = self.plotter.add_button(callback, **self._add_kwargs)
-        self.plotter.render()
+        widget = self.plotter.at(0).add_button(callback, **self._add_kwargs)
+        self.plotter.at(0).render()
         return widget
 
     def state_to_messages(self, state: str) -> Iterable[TopicMessage]:
@@ -588,8 +590,8 @@ class AgeThresholdWidgetOps:
         Returns:
             The created `Slider2D` widget.
         """
-        widget = self.plotter.add_slider(callback, **self._add_kwargs)
-        self.plotter.render()
+        widget = self.plotter.at(0).add_slider(callback, **self._add_kwargs)
+        self.plotter.at(0).render()
         return widget
 
     def set_state(self, widget: Slider2D, value: int) -> None:
@@ -847,8 +849,8 @@ class ClickWidgetOps:
                 captures a 3D location.
         """
         self._on_change_cb = callback
-        self.plotter.add_callback("LeftButtonPress", self.on_right_click)
-        self.plotter.add_callback("RightButtonPress", self.on_left_click)
+        self.plotter.at(0).add_callback("LeftButtonPress", self.on_right_click)
+        self.plotter.at(0).add_callback("RightButtonPress", self.on_left_click)
 
     def extract_state(self, widget: None) -> Location3D:
         """Return the last picked 3D location."""
@@ -890,14 +892,14 @@ class ClickWidgetOps:
         Notes:
             Bound to the "RightButtonPress" event in `self.add()`.
         """
-        renderer = self.plotter.renderer
+        renderer = self.plotter.at(0).renderer
         if renderer is not None:
             cam = renderer.GetActiveCamera()
             cam.SetPosition(self.cam_dict["pos"])
             cam.SetFocalPoint(self.cam_dict["focal_point"])
             cam.SetViewUp((0, 1, 0))
             cam.SetClippingRange((0.01, 1000.01))
-            self.plotter.render()
+            self.plotter.at(0).render()
 
 
 class CorrelationPlotWidgetOps:
@@ -1209,7 +1211,7 @@ class CorrelationPlotWidgetOps:
 
         widget = Image(g.figure)
         plt.close(g.figure)
-        self.plotter.add(widget)
+        self.plotter.at(0).add(widget)
         return widget
 
     def get_closest_row(self, df: DataFrame, slope: float, error: float) -> Series:
@@ -1238,7 +1240,7 @@ class CorrelationPlotWidgetOps:
     def add_info_text(self) -> None:
         """Summarize hypotheses statistics from a dataframe and add to plot."""
         if self.info_widget is not None:
-            self.plotter.remove(self.info_widget)
+            self.plotter.at(0).remove(self.info_widget)
 
         if self.df.empty:
             return
@@ -1261,12 +1263,12 @@ class CorrelationPlotWidgetOps:
         )
 
         self.info_widget = Text2D(txt=text, pos="top-left")
-        self.plotter.add(self.info_widget)
+        self.plotter.at(0).add(self.info_widget)
 
     def add_mlh_circle(self):
         """Adds the circle marker for the MLH."""
         if self.mlh_circle is not None:
-            self.plotter.remove(self.mlh_circle)
+            self.plotter.at(0).remove(self.mlh_circle)
 
         if self.df.empty:
             return
@@ -1285,7 +1287,7 @@ class CorrelationPlotWidgetOps:
 
         self.mlh_circle = Circle(pos=gui_location.to_numpy(), r=3.0, res=16)
         self.mlh_circle.c("green")
-        self.plotter.add(self.mlh_circle)
+        self.plotter.at(0).add(self.mlh_circle)
 
     def add_highlight_circle(self, gui_location: Location3D):
         """Adds the circle marker for the selected hypothesis.
@@ -1294,11 +1296,11 @@ class CorrelationPlotWidgetOps:
             gui_location: the location at which to add the marker
         """
         if self.highlight_circle is not None:
-            self.plotter.remove(self.highlight_circle)
+            self.plotter.at(0).remove(self.highlight_circle)
 
         self.highlight_circle = Circle(pos=gui_location.to_numpy(), r=3.0, res=16)
         self.highlight_circle.c("red")
-        self.plotter.add(self.highlight_circle)
+        self.plotter.at(0).add(self.highlight_circle)
 
     def update_plot(self, widget: Image, msgs: list[TopicMessage]) -> tuple[Any, bool]:
         """Rebuild the plot for the selected episode, step, object, and age threshold.
@@ -1315,7 +1317,7 @@ class CorrelationPlotWidgetOps:
             `(new_widget, True)` where `new_widget` is the new image actor.
         """
         if self.highlight_circle is not None:
-            self.plotter.remove(self.highlight_circle)
+            self.plotter.at(0).remove(self.highlight_circle)
         self.selected_hypothesis = None
 
         # Build DataFrame and filter by age
@@ -1331,7 +1333,7 @@ class CorrelationPlotWidgetOps:
 
         # Add the scatter correlation plot to the scene
         if widget is not None:
-            self.plotter.remove(widget)
+            self.plotter.at(0).remove(widget)
         widget = self.add_correlation_figure()
 
         # Add info text to scene
@@ -1340,7 +1342,7 @@ class CorrelationPlotWidgetOps:
         # Add mlh circle to scene
         self.add_mlh_circle()
 
-        self.plotter.render()
+        self.plotter.at(0).render()
         return widget, True
 
     def update_selection(
@@ -1389,7 +1391,7 @@ class CorrelationPlotWidgetOps:
         # Add the selected hypothesis marker
         self.add_highlight_circle(gui_location)
 
-        self.plotter.render()
+        self.plotter.at(0).render()
         return widget, True
 
 
@@ -1423,6 +1425,8 @@ class HypothesisMeshWidgetOps:
             ),
         ]
 
+        self.plotter.at(2).add(Text2D(txt="Selected Hypothesis", pos="top-center"))
+
     def clear_mesh(
         self, widget: Mesh | None, msgs: list[TopicMessage]
     ) -> tuple[Any, bool]:
@@ -1436,9 +1440,9 @@ class HypothesisMeshWidgetOps:
             `(widget, False)` to indicate no publish should occur.
         """
         if widget is not None:
-            self.plotter.remove(widget)
+            self.plotter.at(2).remove(widget)
 
-        self.plotter.render()
+        self.plotter.at(2).render()
         return widget, False
 
     def update_mesh(
@@ -1468,11 +1472,10 @@ class HypothesisMeshWidgetOps:
         widget.rotate_x(hypothesis["Rot_x"])
         widget.rotate_y(hypothesis["Rot_y"])
         widget.rotate_z(hypothesis["Rot_z"])
-        widget.scale(1500)
-        widget.pos(1000, 0, -500)
-        self.plotter.add(widget)
+        widget.shift(0, 1.5, 0)
 
-        self.plotter.render()
+        self.plotter.at(2).add(widget)
+        self.plotter.at(2).render()
 
         return widget, False
 
@@ -1619,7 +1622,7 @@ class HypSpaceSizeWidgetOps:
         widget.scale(0.6)
         widget.pos(-400, 300, 0)
         plt.close(fig)
-        self.plotter.add(widget)
+        self.plotter.at(0).add(widget)
         return widget
 
     def update_plot(
@@ -1635,7 +1638,7 @@ class HypSpaceSizeWidgetOps:
             `(new_widget, False)` to indicate no publish should occur.
         """
         if widget is not None:
-            self.plotter.remove(widget)
+            self.plotter.at(0).remove(widget)
 
         msgs_dict = {msg.name: msg.value for msg in msgs}
 
@@ -1643,7 +1646,7 @@ class HypSpaceSizeWidgetOps:
         widget = self.add_hyp_space_size_figure(
             hyp_size_df, msgs_dict["current_object"]
         )
-        self.plotter.render()
+        self.plotter.at(0).render()
         return widget, False
 
 
@@ -2042,7 +2045,7 @@ class HypothesisLifespanWidgetOps:
         widget.scale(0.6)
         widget.pos(650, 300, 0)
         plt.close(fig)
-        self.plotter.add(widget)
+        self.plotter.at(0).add(widget)
         return widget
 
     def _add_info_text(self, hyp: Series):
@@ -2053,7 +2056,7 @@ class HypothesisLifespanWidgetOps:
             + f"Pose Error: {hyp['Pose Error']:.2f}"
         )
         self.info_widget = Text2D(txt=info, pos="top-right")
-        self.plotter.add(self.info_widget)
+        self.plotter.at(0).add(self.info_widget)
 
     def update_plot(
         self, widget: Image | None, msgs: list[TopicMessage]
@@ -2069,7 +2072,7 @@ class HypothesisLifespanWidgetOps:
         """
         self.clear_plot(widget, msgs)
         # if widget is not None:
-        #     self.plotter.remove(widget)
+        #     self.plotter.at(0).remove(widget)
 
         msgs_dict = {msg.name: msg.value for msg in msgs}
         episode = str(msgs_dict["episode_number"])
@@ -2088,7 +2091,7 @@ class HypothesisLifespanWidgetOps:
 
         self._add_info_text(hyp)
 
-        self.plotter.render()
+        self.plotter.at(0).render()
 
         return widget, False
 
@@ -2105,13 +2108,13 @@ class HypothesisLifespanWidgetOps:
             `(widget, False)` to indicate no publish should occur.
         """
         if widget is not None:
-            self.plotter.remove(widget)
+            self.plotter.at(0).remove(widget)
 
         if self.info_widget is not None:
-            self.plotter.remove(self.info_widget)
+            self.plotter.at(0).remove(self.info_widget)
             self.info_widget = None
 
-        self.plotter.render()
+        self.plotter.at(0).render()
 
         return None, False
 
@@ -2146,10 +2149,23 @@ class InteractivePlot:
         exp_path: str,
         data_path: str,
     ):
+        renderer_areas = [
+            {"bottomleft": (0.0, 0.0), "topright": (1.0, 1.0)},
+            {"bottomleft": (0.05, 0.3), "topright": (0.25, 0.6)},
+            {"bottomleft": (0.75, 0.3), "topright": (0.95, 0.6)},
+        ]
+
+        self.axes_dict = {
+            "xrange": (-0.05, 0.05),
+            "yrange": (1.45, 1.55),
+            "zrange": (-0.05, 0.05),
+        }
+        self.cam_dict = {"pos": (300, 200, 1500), "focal_point": (300, 200, 0)}
+
         self.data_parser = DataParser(exp_path)
         self.ycb_loader = YCBMeshLoader(data_path)
         self.event_bus = Publisher()
-        self.plotter = Plotter().render()
+        self.plotter = Plotter(shape=renderer_areas, sharecam=False).render()
         self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=33)
 
         # create and add the widgets to the plotter
@@ -2159,18 +2175,15 @@ class InteractivePlot:
         self._widgets["episode_slider"].set_state(0)
         self._widgets["age_threshold"].set_state(0)
 
-        self.plotter.show(interactive=True, resetcam=False, camera=self.cam_dict())
-
-    def cam_dict(self) -> dict[str, tuple[float, float, float]]:
-        """Returns camera parameters for an overhead view of the plot.
-
-        Returns:
-            Dictionary with camera position and focal point.
-        """
-        x_val = 300
-        y_val = 200
-        z_val = 1500
-        return {"pos": (x_val, y_val, z_val), "focal_point": (x_val, y_val, 0)}
+        self.plotter.at(0).show(
+            camera=deepcopy(self.cam_dict), interactive=False, resetcam=False
+        )
+        self.plotter.at(1).show(
+            axes=deepcopy(self.axes_dict), interactive=False, resetcam=True
+        )
+        self.plotter.at(2).show(
+            axes=deepcopy(self.axes_dict), interactive=True, resetcam=True
+        )
 
     def create_widgets(self):
         widgets = {}
@@ -2250,7 +2263,9 @@ class InteractivePlot:
         )
 
         widgets["click_widget"] = Widget[None, Location3D](
-            widget_ops=ClickWidgetOps(plotter=self.plotter, cam_dict=self.cam_dict()),
+            widget_ops=ClickWidgetOps(
+                plotter=self.plotter, cam_dict=deepcopy(self.cam_dict)
+            ),
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.1,
