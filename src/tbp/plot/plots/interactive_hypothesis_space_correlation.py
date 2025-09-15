@@ -1422,7 +1422,6 @@ class HypothesisMeshWidgetOps:
                 callback=self.update_mesh,
             ),
         ]
-        self.info_widget: Text2D | None = None
 
     def clear_mesh(
         self, widget: Mesh | None, msgs: list[TopicMessage]
@@ -1438,10 +1437,6 @@ class HypothesisMeshWidgetOps:
         """
         if widget is not None:
             self.plotter.remove(widget)
-
-        if self.info_widget is not None:
-            self.plotter.remove(self.info_widget)
-            self.info_widget = None
 
         self.plotter.render()
         return widget, False
@@ -1476,18 +1471,6 @@ class HypothesisMeshWidgetOps:
         widget.scale(1500)
         widget.pos(1000, 0, -500)
         self.plotter.add(widget)
-
-        # Add info text
-        info = (
-            f"Object: {hypothesis['graph_id']}\n"
-            + f"Age: {hypothesis['age']}\n"
-            + f"Evidence: {hypothesis['Evidence']:.2f}\n"
-            + f"Evidence Slope: {hypothesis['Evidence Slope']:.2f}\n"
-            + f"Pose Error: {hypothesis['Pose Error']:.2f}"
-        )
-        info_widget = Text2D(txt=info, pos="top-right")
-        self.plotter.add(info_widget)
-        self.info_widget = info_widget
 
         self.plotter.render()
 
@@ -1697,6 +1680,8 @@ class HypothesisLifespanWidgetOps:
             ),
         ]
         self._locators = self.create_locators()
+
+        self.info_widget: Text2D | None = None
 
     def create_locators(self) -> dict[str, DataLocator]:
         """Returns data locators used by this widget."""
@@ -2060,6 +2045,16 @@ class HypothesisLifespanWidgetOps:
         self.plotter.add(widget)
         return widget
 
+    def _add_info_text(self, hyp: Series):
+        info = (
+            f"Age: {hyp['age']}\n"
+            + f"Evidence: {hyp['Evidence']:.2f}\n"
+            + f"Evidence Slope: {hyp['Evidence Slope']:.2f}\n"
+            + f"Pose Error: {hyp['Pose Error']:.2f}"
+        )
+        self.info_widget = Text2D(txt=info, pos="top-right")
+        self.plotter.add(self.info_widget)
+
     def update_plot(
         self, widget: Image | None, msgs: list[TopicMessage]
     ) -> tuple[Image | None, bool]:
@@ -2072,8 +2067,9 @@ class HypothesisLifespanWidgetOps:
         Returns:
             `(new_widget, False)` to indicate no publish should occur.
         """
-        if widget is not None:
-            self.plotter.remove(widget)
+        self.clear_plot(widget, msgs)
+        # if widget is not None:
+        #     self.plotter.remove(widget)
 
         msgs_dict = {msg.name: msg.value for msg in msgs}
         episode = str(msgs_dict["episode_number"])
@@ -2089,6 +2085,9 @@ class HypothesisLifespanWidgetOps:
         widget = self._add_lifespan_figure(
             df, current_episode=int(episode), current_step=step
         )
+
+        self._add_info_text(hyp)
+
         self.plotter.render()
 
         return widget, False
@@ -2107,7 +2106,13 @@ class HypothesisLifespanWidgetOps:
         """
         if widget is not None:
             self.plotter.remove(widget)
-            self.plotter.render()
+
+        if self.info_widget is not None:
+            self.plotter.remove(self.info_widget)
+            self.info_widget = None
+
+        self.plotter.render()
+
         return None, False
 
 
