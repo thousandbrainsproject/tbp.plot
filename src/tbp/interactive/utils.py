@@ -189,6 +189,12 @@ class CoordinateMapper:
 class VtkDebounceScheduler:
     """Single repeating VTK timer that services many debounced callbacks.
 
+    Debouncing restricts how often a function is called by waiting for a specified
+    period of inactivity after an event occurs before executing the callback. This
+    way we can keep changing the widget states, but it won't call the expensive
+    callback until we stop changing the widget state for some time (i.e.,
+    `debounce sec`) to ensure the UI stays responsive.
+
     The scheduler keeps one repeating VTK timer and a registry of callbacks that
     are scheduled to run once at or after a given time. Each callback is keyed
     by a hashable token.
