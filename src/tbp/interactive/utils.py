@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import time
 from bisect import bisect_left
+from collections.abc import Callable, Hashable, Iterable
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any, Callable, Hashable, Iterable
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -152,33 +153,33 @@ class CoordinateMapper:
         if self.data.width() <= 0 or self.data.height() <= 0:
             raise ValueError("Data bounds must have positive width and height")
 
-    def map_click_to_data_coords(self, location: Location2D) -> Location2D:
+    def map_click_to_data_coords(self, gui_location: Location2D) -> Location2D:
         """Map a GUI click (x, y) to data coordinates (x_val, y_val).
 
         Args:
-            location: Click location in GUI coordinates.
+            gui_location: Click location in GUI coordinates.
 
         Returns:
             Location of the click point in data coordinates.
         """
-        x_rel = (location.x - self.gui.xmin) / self.gui.width()
-        y_rel = (location.y - self.gui.ymin) / self.gui.height()
+        x_rel = (gui_location.x - self.gui.xmin) / self.gui.width()
+        y_rel = (gui_location.y - self.gui.ymin) / self.gui.height()
 
         x_val = self.data.xmin + x_rel * self.data.width()
         y_val = self.data.ymin + y_rel * self.data.height()
         return Location2D(x_val, y_val)
 
-    def map_data_coords_to_world(self, location: Location2D) -> Location2D:
+    def map_data_coords_to_world(self, data_location: Location2D) -> Location2D:
         """Map data coordinates (x, y) back to GUI coordinates (x_gui, y_gui).
 
         Args:
-            location: Point in data coordinates.
+            data_location: Point in data coordinates.
 
         Returns:
             Location of the point in GUI coordinates.
         """
-        x_rel = (location.x - self.data.xmin) / self.data.width()
-        y_rel = (location.y - self.data.ymin) / self.data.height()
+        x_rel = (data_location.x - self.data.xmin) / self.data.width()
+        y_rel = (data_location.y - self.data.ymin) / self.data.height()
 
         x_gui = self.gui.xmin + x_rel * self.gui.width()
         y_gui = self.gui.ymin + y_rel * self.gui.height()
