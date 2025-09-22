@@ -1,26 +1,26 @@
 
 # Interactive Visualizations Wrapper
 
-This provides a wrapper library to help build interactive visualization in a more structured manner.
-The core idea is that every visualization consists of a **collection of `Widget` instances** that communicate with eachother through **Pub/Sub topic messages**.
-The behavior of each `Widget` is customized by passing `WidgetOps` which holds widget-specific functions (e.g., the UI element, messages to publish or listen to, etc.)
+This provides a wrapper library to help build interactive visualizations in a more structured manner.
+The core idea is that every visualization consists of a **collection of `Widget` instances** that communicate with each other through **Pub/Sub topic messages**.
+The behavior of each `Widget` is customized by passing `WidgetOps`, which holds widget-specific functions (e.g., the UI element, messages to publish or listen to, etc.)
 
 
 
 ## The `Widget` class
 
 The `Widget` class abstracts away the shared behavior between different types of widgets.
-For example, All widgets may choose to add/remove elements to the UI, or they may publish a state on a specific topic based on UI events (e.g., slider moved or button pressed).
+For example, all widgets may choose to add/remove elements to the UI, or they may publish a state on a specific topic based on UI events (e.g., slider moved or button pressed).
 
-The `Widget` performs a number of tasks:
+The `Widget` performs several tasks:
 1) **Scheduling of debounced messages.**
-This uses a `VtkDebounceScheduler` to collapse repeated widget state messages within a user configurable amount of time (`debounce_sec`) and sends only the last message.
+This uses a `VtkDebounceScheduler` to collapse repeated widget state messages within a user-configurable amount of time (`debounce_sec`) and sends only the last message.
 2) **Ability to deduplicate messages.**
-Messages may not be published if the state remained the same, even after UI interaction.
-For example, a button pressed few times and cycles back to the original state.
+Messages may not be published if the state remains the same, even after UI interaction.
+For example, if a button was pressed a few times and cycles back to the original state.
 This is configurable using the `dedupe` boolean argument.
 3) **Ability to customize widget behavior as composed functionality.**
-The `Widget` class is initialized by passing a `WidgetOps` that defines it's behavior.
+The `Widget` class is initialized by passing a `WidgetOps` that defines its behavior.
 It looks for specific functions within the `WidgetOps` to perform different tasks.
 4) **Type of `Widget[W, S]` can be defined by two Generic variables**.
 We use the Generic type W for widget type and S for state.
@@ -45,7 +45,7 @@ Widget[Slider2D, int](
 The `WidgetOps` can fully customize a `Widget` behavior by providing custom functions that are called from the `Widget` class.
 The `WidgetOps` can significantly vary across widgets.
 For example, some widgets may not add a UI element, others may not publish any messages (e.g., mesh visualizer).
-Therefore, the base `WidgetOpsProto` (protocol) is empty but other functions are defined as added "capabilities".
+Therefore, the base `WidgetOpsProto` (protocol) is empty, but other functions are defined as added "capabilities".
 These capabilities are `runtime_checkable` and are used in the `Widget` class (i.e., through `is_instance`) to check
 if the capability exists.
 
@@ -74,7 +74,7 @@ class HasUpdaters(Protocol[W]):
 ### The `WidgetUpdater` class
 
 The `WidgetOps` can have the `updaters` capability.
-The `updaters` listen to different topic messages and trigger a callback function when it receives messages on those topics.
+The `updaters` listen to different topic messages and trigger a callback function when they receive messages on those topics.
 Every `WidgetOps` can have a list of these updaters with different callback functions.
 
 ```python
@@ -101,7 +101,7 @@ updaters = [
 
 The `WidgetOps` can include other capabilities to add or remove objects to the UI, define how to extract or set the state, and more.
 One important capability is to define the payload function that converts a state to a message to be published on specific topics.
-This can be defined using the `state_to_messages` function which receives a `state` and returns a list of `TopicMessages`.
+This can be defined using the `state_to_messages` function, which receives a `state` and returns a list of `TopicMessages`.
 Each topic message can be sent to a different topic.
 
 ```python
@@ -113,10 +113,10 @@ class HasStateToMessages(Protocol[S]):
 ### Accessing the Data
 
 It is common for `WidgetOps` to require accessing data from experiment logs. 
-A `WidgetOps` can define it's own `DataLocator` instances that describe how to access a dict structure to retrieve information.
+A `WidgetOps` can define its own `DataLocator` instances that describe how to access a dict structure to retrieve information.
 The `DataLocator` describes the path (e.g., keys and indices) to access the required information.
 The `DataLocator` can also be used to query the available options (i.e., keys or indices) at a level of the dictionary.
-This is useful e.g., when setting the step slider range based on a specific episode.
+This is useful, e.g., when setting the step slider range based on a specific episode.
 
 
 ```python
@@ -140,7 +140,7 @@ available_channels = data_parser.query(locator, episode=2, step=3, obj="banana")
 
 ## Toy Example
 
-We can create a simple visualization with two slider widgets; one for episode and another for step.
+We can create a simple visualization with two slider widgets; one for the episode and another for the step.
 
 #### Episode `WidgetOps`:
 
