@@ -34,17 +34,13 @@ plot = "tbp.plot.cli:main"
 dev = [
     # Check for undeclared dependencies
     "deptry",
-
     # Python static type checker
     "mypy==1.11.2",
-
     # Testing, code style, etc...
     "pytest>=8.0,<9",
     "pytest-xdist>=3.6.1,<4",
     "pytest-cov>=6.0,<7",
-
-    # Python linter and formatter
-    "ruff==0.7.1",
+    "ruff>=0.13.1",
 ]
 
 [project.urls]
@@ -158,7 +154,6 @@ ignore = [
     "N804", # N804: First argument of a class method should be named `cls`
     "NPY002", # NPY002: Replace legacy `np.random.normal` call with `np.random.Generator`
     "PD002", # PD002: `inplace=True` should be avoided; it has inconsistent behavior
-    "PD901", # PD901: Avoid using the generic variable name `df` for DataFrames
     "PERF203", # PERF203: `try`-`except` within a loop incurs performance overhead
     "PERF401", # PERF401: Use a list comprehension to create a transformed list
     "PERF402", # PERF402: Use `list` or `list.copy` to create a copy of a list
