@@ -12,6 +12,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import pickle
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -56,6 +58,47 @@ def get_model_path(experiment_log_dir: Path) -> Path:
 
     return model_path
 
+class _MontyShimUnpickler(pickle.Unpickler):
+    """
+    Redirects any class under 'tbp.monty...' to a benign dummy type so we can
+    reconstruct objects and access their data attributes (e.g. .pos) without
+    having the real package installed.
+    """
+    _cache = {}  # cache dummy classes
+
+    def find_class(self, module, name):
+        if module.startswith("tbp.monty"):
+            key = (module, name)
+            cls = self._cache.get(key)
+            if cls is None:
+                cls = type(name, (), {})  
+                self._cache[key] = cls
+            return cls
+        return super().find_class(module, name)
+
+
+class _PickleShimModule:
+    # torch.load will use pickle_module.Unpickler when provided
+    Unpickler = _MontyShimUnpickler
+
+def _torch_load_with_optional_shim(path, map_location="cpu"):
+    """
+    Try a standard torch.load first (weights_only=False because we need objects).
+    If tbp.monty isn't installed and the checkpoint references it, optionally
+    retry using a restricted Unpickler that only dummies tbp.monty.* symbols.
+    """
+    try:
+        return torch.load(path, map_location=map_location, weights_only=False)
+    except ModuleNotFoundError as e:
+        # Only intercept the specific missing tbp.monty namespace
+        if "tbp.monty" not in str(e):
+            raise
+        return torch.load(
+            path,
+            map_location=map_location,
+            weights_only=False,
+            pickle_module=_PickleShimModule,
+        )
 
 def load_object_model(
     model_path: Path,
@@ -83,17 +126,40 @@ def load_object_model(
     Returns:
         The object model transformed to world frame.
     """
-    data = torch.load(model_path, map_location=torch.device("cpu"), weights_only=False)
+
+    # Use an optional tbp.monty shim so users can load checkpoints from any path
+    # without requiring tbp.monty to be installed. See _torch_load_with_optional_shim.
+    data = _torch_load_with_optional_shim(model_path, map_location="cpu")
     data = data["lm_dict"][lm_id]["graph_memory"][object_name][
         "patch"
-    ]  # GraphObjectModel
-    points = np.array(data.pos, dtype=float)
+    ]._graph  # GridObjectModel
+    
+    pos = getattr(data, "pos", None)
+    if pos is None and hasattr(data, "__dict__"):
+        pos = data.__dict__.get("pos")
+    if pos is None:
+        raise RuntimeError("Expected attribute 'pos' on patch object")
+    if isinstance(pos, torch.Tensor):
+        points = pos.detach().cpu().numpy().astype(float)
+    else:
+        points = np.asarray(pos, dtype=float)
 
     feature_dict = {}
 
-    for feature in data.feature_mapping.keys():
-        idx = data.feature_mapping[feature]
-        feature_data = np.array(data.x[:, idx[0] : idx[1]])
+    feature_mapping = getattr(data, "feature_mapping", {}) or {}
+    x = getattr(data, "x", None)
+    if x is None and hasattr(data, "__dict__"):
+        x = data.__dict__.get("x")
+    if isinstance(x, torch.Tensor):
+        x_np = x.detach().cpu().numpy()
+    else:
+        x_np = np.asarray(x) if x is not None else None
+
+    for feature, idx in feature_mapping.items():
+        # idx is expected to be [start, end)
+        if x_np is None:
+            raise RuntimeError("Expected attribute 'x' on patch object for features")
+        feature_data = np.asarray(x_np[:, idx[0]: idx[1]])
         feature_dict[feature] = feature_data
 
     return ObjectModelForVisualization(
