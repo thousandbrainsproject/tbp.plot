@@ -1672,6 +1672,11 @@ class HypSpaceSizeWidgetOps:
     ) -> Image:
         """Plot current vs others vs total Hyp space size relative to step 0.
 
+        Note that the "current" label refers to the current selected object (not
+        necessarily the primary target). The "others" label refers to all the other
+        objects combined. The "total" label refers to all objects combined (current and
+        others).
+
         Args:
             df: DataFrame with columns ["step", "object", "size"] for one episode.
             current_object: Object label to isolate as the "current" line.
