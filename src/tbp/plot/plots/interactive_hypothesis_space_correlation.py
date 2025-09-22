@@ -2167,8 +2167,6 @@ class HypothesisLifespanWidgetOps:
             `(new_widget, False)` to indicate no publish should occur.
         """
         self.clear_plot(widget, msgs)
-        # if widget is not None:
-        #     self.plotter.at(0).remove(widget)
 
         msgs_dict = {msg.name: msg.value for msg in msgs}
         episode = str(msgs_dict["episode_number"])
