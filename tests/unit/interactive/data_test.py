@@ -100,8 +100,8 @@ class BaseWithSampleData(unittest.TestCase):
     def test_query_returns_key_candidates(self) -> None:
         loc = DataLocator(
             path=[
-                DataLocatorStep.key("mlh", "mlh"),
-                DataLocatorStep.key("field", None),
+                DataLocatorStep.key("first", "mlh"),
+                DataLocatorStep.key("second", None),
             ]
         )
         candidates = self.parser.query(loc)
