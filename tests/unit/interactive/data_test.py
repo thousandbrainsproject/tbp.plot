@@ -41,6 +41,25 @@ class FakeDataParser(DataParser):
         }
 
 
+class FakeRepeatedDataParser(DataParser):
+    """Parser class that bypasses loading by injecting data directly.
+
+    The data in this classes contains repeated keys in the nested dictionary.
+    """
+
+    def __init__(self):
+        self.data = {
+            "0": [  # < --- Key 0 is repeated
+                {
+                    "steps": {"0": "test1"},  # < --- Key 0 is repeated
+                },
+                {
+                    "steps": {"0": "test2"},
+                },
+            ]
+        }
+
+
 def make_run_episode_step_locator(
     run_val: int | None = None,
     ep_val: int | None = None,
@@ -123,6 +142,20 @@ class BaseWithSampleData(unittest.TestCase):
         )
         missing = loc.missing_steps()
         self.assertEqual([s.name for s in missing], ["run_idx", "ep_idx"])
+
+    def test_repeating_key_in_nested_dictionary(self) -> None:
+        parser = FakeRepeatedDataParser()
+        loc = DataLocator(
+            path=[
+                DataLocatorStep.key("episode", "0"),  # <-- repeated
+                DataLocatorStep.index("step", None),
+                DataLocatorStep.key("type", "steps"),
+                DataLocatorStep.index("time", "0"),  # <-- repeated
+            ]
+        )
+
+        self.assertEqual(parser.extract(loc, step=0), "test1")
+        self.assertEqual(parser.extract(loc, step=1), "test2")
 
     def test_extend_clones_and_appends(self) -> None:
         base = DataLocator(path=[DataLocatorStep.key("runs", "runs")])
