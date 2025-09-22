@@ -40,6 +40,8 @@ dev = [
     "pytest>=8.0,<9",
     "pytest-xdist>=3.6.1,<4",
     "pytest-cov>=6.0,<7",
+
+    # Style checks
     "ruff>=0.13.1",
 ]
 
