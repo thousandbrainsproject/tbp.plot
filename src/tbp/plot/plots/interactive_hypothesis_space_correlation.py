@@ -1615,7 +1615,7 @@ class HypSpaceSizeWidgetOps:
         """Returns data locators used by this widget."""
         locators = {}
 
-        locators["hyp_space_size"] = DataLocator(
+        locators["hyp_space"] = DataLocator(
             path=[
                 DataLocatorStep.key(name="episode"),
                 DataLocatorStep.key(name="lm", value="LM_0"),
@@ -1642,12 +1642,12 @@ class HypSpaceSizeWidgetOps:
         """
         # Objects available in this episode (same across steps)
         objects_list = self.data_parser.query(
-            self._locators["hyp_space_size"], episode=str(episode), step=0
+            self._locators["hyp_space"], episode=str(episode), step=0
         )
 
         # All steps for this episode
         steps = self.data_parser.query(
-            self._locators["hyp_space_size"], episode=str(episode)
+            self._locators["hyp_space"], episode=str(episode)
         )
 
         rows: list[dict[str, int | str]] = []
@@ -1655,7 +1655,7 @@ class HypSpaceSizeWidgetOps:
             for obj in objects_list:
                 size = len(
                     self.data_parser.extract(
-                        self._locators["hyp_space_size"],
+                        self._locators["hyp_space"],
                         episode=str(episode),
                         step=step,
                         obj=obj,
