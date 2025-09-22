@@ -1520,6 +1520,7 @@ class HypothesisMeshWidgetOps:
                 callback=self.update_mesh,
             ),
         ]
+        self.default_object_position = (0, 1.5, 0)
 
         self.plotter.at(2).add(Text2D(txt="Selected Hypothesis", pos="top-center"))
 
@@ -1568,7 +1569,7 @@ class HypothesisMeshWidgetOps:
         widget.rotate_x(hypothesis["Rot_x"])
         widget.rotate_y(hypothesis["Rot_y"])
         widget.rotate_z(hypothesis["Rot_z"])
-        widget.shift(0, 1.5, 0)
+        widget.shift(self.default_object_position)
 
         self.plotter.at(2).add(widget)
         self.plotter.at(2).render()
