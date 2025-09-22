@@ -1176,6 +1176,7 @@ class CorrelationPlotWidgetOps:
             if len(removed_ids) > 0:
                 df_removed = DataFrame(
                     {
+                        "id": removed_ids,
                         "graph_id": graph_id,
                         "Evidence": np.array(channel_data["evidence"])[removed_ids],
                         "Evidence Slope": np.array(updater_data["evidence_slopes"])[
@@ -1200,6 +1201,7 @@ class CorrelationPlotWidgetOps:
             if added_ids:
                 df_added = DataFrame(
                     {
+                        "id": added_ids,
                         "graph_id": graph_id,
                         "Evidence": np.array(channel_data["evidence"])[added_ids],
                         "Evidence Slope": np.array(updater_data["evidence_slopes"])[
@@ -1222,6 +1224,7 @@ class CorrelationPlotWidgetOps:
             if maintained_ids:
                 df_maintained = DataFrame(
                     {
+                        "id": maintained_ids,
                         "graph_id": graph_id,
                         "Evidence": np.array(channel_data["evidence"])[maintained_ids],
                         "Evidence Slope": np.array(updater_data["evidence_slopes"])[
@@ -1921,34 +1924,6 @@ class HypothesisLifespanWidgetOps:
 
         return (None, None)
 
-    def _find_index_by_rotation(
-        self,
-        channel_rots: Iterable[Iterable[float]],
-        target_rot_xyz: tuple[float, float, float],
-        tol_deg: float = 1e-3,
-    ) -> int | None:
-        """Find the hypothesis index at a given step using rotation and age.
-
-        Args:
-            channel_rots: Iterable of rotations for all hypotheses at the current step,
-                shaped like (N, 3), where each inner iterable is (Rot_x, Rot_y, Rot_z)
-                in degrees.
-            target_rot_xyz: Target rotation as (Rot_x, Rot_y, Rot_z) in degrees
-                to identify the selected hypothesis.
-            tol_deg: Absolute tolerance in degrees used for element-wise comparison;
-                a hypothesis matches if all three absolute differences are <= `tol_deg`.
-
-        Returns:
-            Index of the selected hypotheses
-        """
-        rx, ry, rz = target_rot_xyz
-
-        # Match rotations within tolerance
-        candidates = np.arange(len(channel_rots))
-        diffs = np.abs(np.array(channel_rots) - np.array([rx, ry, rz])[None, :])
-        matches = np.all(diffs <= tol_deg, axis=1)
-        return int(candidates[np.argmax(matches)])
-
     def _trace_hypothesis(
         self, episode: str, step: int, obj: str, ix: int
     ) -> DataFrame:
@@ -2178,13 +2153,8 @@ class HypothesisLifespanWidgetOps:
         episode = str(msgs_dict["episode_number"])
         step = int(msgs_dict["step_number"])
         hyp = msgs_dict["selected_hypothesis"]
-        obj = hyp["graph_id"]
-        target_rot_xyz = (float(hyp["Rot_x"]), float(hyp["Rot_y"]), float(hyp["Rot_z"]))
 
-        data = self._extract_channel_data(episode, step, obj)
-        ix = self._find_index_by_rotation(data["rotations"], target_rot_xyz)
-
-        df = self._trace_hypothesis(episode, step, obj, ix)
+        df = self._trace_hypothesis(episode, step, hyp["graph_id"], hyp["id"])
         widget = self._add_lifespan_figure(
             df, current_episode=int(episode), current_step=step
         )
