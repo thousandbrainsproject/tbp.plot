@@ -20,9 +20,8 @@ Usage:
 
 from __future__ import annotations
 
-import os
 import logging
-import sys
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
@@ -40,17 +39,19 @@ from vedo import (
     settings,
 )
 
-from tbp.plot.plots.interactive_hypothesis_oorf_visualizer_utils.geometry import get_custom_distances
 from tbp.plot.plots.interactive_hypothesis_oorf_visualizer_utils.geometry import (
+    get_custom_distances,
     rotate_pose_dependent_features,
 )
+from tbp.plot.registry import attach_args, register
 
-from .interactive_hypothesis_oorf_visualizer_utils.data_models import ObjectModelForVisualization
+from .interactive_hypothesis_oorf_visualizer_utils.data_models import (
+    ObjectModelForVisualization,
+)
 from .interactive_hypothesis_oorf_visualizer_utils.episode_loader import (
     EpisodeDataLoader,
     get_model_path,
 )
-from tbp.plot.registry import register, attach_args
 
 if TYPE_CHECKING:
     import argparse
@@ -259,9 +260,12 @@ class HypothesesOORFVisualizer:
         """Create interactive visualization with slider for timestep navigation."""
         # Create plotter main view and 2 small overlays for sensor images
         custom_view_areas = [
-            dict(bottomleft=(0.0, 0.0), topright=(1.0, 1.0)),  # Main view (full window)
-            dict(bottomleft=(0.73, 0.79), topright=(0.86, 0.99)),  # SM_0 (top-right)
-            dict(bottomleft=(0.86, 0.79), topright=(0.99, 0.99)),  # SM_1 (top-right)
+            {
+                "bottomleft": (0.0, 0.0),
+                "topright": (1.0, 1.0),
+            },  # Main view (full window)
+            {"bottomleft": (0.73, 0.79), "topright": (0.86, 0.99)},  # SM_0 (top-right)
+            {"bottomleft": (0.86, 0.79), "topright": (0.99, 0.99)},  # SM_1 (top-right)
         ]
 
         self.plotter = Plotter(
@@ -322,7 +326,7 @@ class HypothesesOORFVisualizer:
         self.plotter.at(self.main_renderer_ix).show(
             axes=True,
             viewup="y",
-            camera=dict(pos=(0.5, 1.5, 0.5), focal_point=(0, 1.5, 0)),
+            camera={"pos": (0.5, 1.5, 0.5), "focal_point": (0, 1.5, 0)},
         )
         self.plotter.show(interactive=True)
 
@@ -702,7 +706,9 @@ class HypothesesOORFVisualizer:
             sample_indices
         ]  # Shape: (n_sampled, 3, 3)
 
-        for location, feature_orientation in zip(locations, feature_orientations):
+        for location, feature_orientation in zip(
+            locations, feature_orientations, strict=False
+        ):
             surface_normal = feature_orientation[0, :]
 
             arrow_normal = Arrow(
@@ -855,6 +861,7 @@ class HypothesesOORFVisualizer:
             )
             self.plotter.at(self.main_renderer_ix).add(item)
 
+
 def setup_env(monty_logs_dir_default: str = "~/tbp/results/monty/"):
     """Setup environment variables for Monty.
 
@@ -889,12 +896,17 @@ def setup_env(monty_logs_dir_default: str = "~/tbp/results/monty/"):
         os.environ["WANDB_DIR"] = wandb_dir
         print(f"WANDB_DIR not set. Using default directory: {wandb_dir}")
 
-@register("interactive_hypothesis_oorf_visualizer", description="Interactive tool to visualize hypotheses' locations and rotations.")
+
+@register(
+    "interactive_hypothesis_oorf_visualizer",
+    description="Interactive tool to visualize hypotheses' locations and rotations.",
+)
 def main(experiment_log_dir: Path, episode_id: int = 0) -> int:
     """Plot target object hypotheses with interactive timestep slider.
 
     Args:
-        exp_path: Path to experiment directory containing detailed_run_stats.json
+        experiment_log_dir: Path to experiment directory containing
+            detailed_run_stats.json
         episode_id: Episode ID to visualize (default: 0)
 
     Returns:
@@ -913,6 +925,7 @@ def main(experiment_log_dir: Path, episode_id: int = 0) -> int:
     visualizer.create_interactive_visualization()
 
     return 0
+
 
 @attach_args("interactive_hypothesis_oorf_visualizer")
 def add_arguments(

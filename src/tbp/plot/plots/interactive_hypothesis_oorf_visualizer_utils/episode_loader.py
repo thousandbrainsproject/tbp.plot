@@ -12,14 +12,12 @@
 from __future__ import annotations
 
 import logging
-import os
 import pickle
 from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
 
-from .geometry import get_relevant_curvature
 from tbp.plot.plots.stats import deserialize_json_chunks
 
 from .data_models import (
@@ -27,6 +25,7 @@ from .data_models import (
     transform_locations_model_to_world,
     transform_orientations_model_to_world,
 )
+from .geometry import get_relevant_curvature
 
 
 class TimestepMappingError(ValueError):
@@ -58,12 +57,20 @@ def get_model_path(experiment_log_dir: Path) -> Path:
 
     return model_path
 
+
 class _MontyShimUnpickler(pickle.Unpickler):
+    """Unpickler that shims out ``tbp.monty`` classes with lightweight dummies.
+
+    Any class reference from a module path starting with ``tbp.monty`` is
+    redirected to a dynamically created dummy class. This allows deserialization
+    of checkpoints that reference ``tbp.monty`` types even when the actual
+    package is not installed, while still making object attributes
+    (e.g., ``.pos``, ``.x``) accessible.
+
+    Dummy classes are cached by ``(module, name)`` so that repeated lookups
+    return the same type.
     """
-    Redirects any class under 'tbp.monty...' to a benign dummy type so we can
-    reconstruct objects and access their data attributes (e.g. .pos) without
-    having the real package installed.
-    """
+
     _cache = {}  # cache dummy classes
 
     def find_class(self, module, name):
@@ -71,7 +78,7 @@ class _MontyShimUnpickler(pickle.Unpickler):
             key = (module, name)
             cls = self._cache.get(key)
             if cls is None:
-                cls = type(name, (), {})  
+                cls = type(name, (), {})
                 self._cache[key] = cls
             return cls
         return super().find_class(module, name)
@@ -81,11 +88,23 @@ class _PickleShimModule:
     # torch.load will use pickle_module.Unpickler when provided
     Unpickler = _MontyShimUnpickler
 
+
 def _torch_load_with_optional_shim(path, map_location="cpu"):
-    """
+    """Load a torch checkpoint with optional fallback for tbp.monty shimming.
+
     Try a standard torch.load first (weights_only=False because we need objects).
     If tbp.monty isn't installed and the checkpoint references it, optionally
     retry using a restricted Unpickler that only dummies tbp.monty.* symbols.
+
+    Args:
+        path: Path to the checkpoint file.
+        map_location: Device mapping passed to `torch.load` (default: "cpu").
+
+    Returns:
+        The deserialized checkpoint object.
+
+    Raises:
+        ModuleNotFoundError: If a missing module other than `tbp.monty` is required.
     """
     try:
         return torch.load(path, map_location=map_location, weights_only=False)
@@ -99,6 +118,7 @@ def _torch_load_with_optional_shim(path, map_location="cpu"):
             weights_only=False,
             pickle_module=_PickleShimModule,
         )
+
 
 def load_object_model(
     model_path: Path,
@@ -125,15 +145,18 @@ def load_object_model(
 
     Returns:
         The object model transformed to world frame.
-    """
 
+    Raises:
+        RuntimeError: If the patch object does not have the required 'pos' attribute.
+        RuntimeError: If the patch object does not have the required 'x' attribute
+    """
     # Use an optional tbp.monty shim so users can load checkpoints from any path
     # without requiring tbp.monty to be installed. See _torch_load_with_optional_shim.
     data = _torch_load_with_optional_shim(model_path, map_location="cpu")
     data = data["lm_dict"][lm_id]["graph_memory"][object_name][
         "patch"
     ]._graph  # GridObjectModel
-    
+
     pos = getattr(data, "pos", None)
     if pos is None and hasattr(data, "__dict__"):
         pos = data.__dict__.get("pos")
@@ -159,7 +182,7 @@ def load_object_model(
         # idx is expected to be [start, end)
         if x_np is None:
             raise RuntimeError("Expected attribute 'x' on patch object for features")
-        feature_data = np.asarray(x_np[:, idx[0]: idx[1]])
+        feature_data = np.asarray(x_np[:, idx[0] : idx[1]])
         feature_dict[feature] = feature_data
 
     return ObjectModelForVisualization(

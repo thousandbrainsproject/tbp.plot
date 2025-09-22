@@ -1,9 +1,20 @@
-import numpy as np
-import logging
+# Copyright 2025 Thousand Brains Project
+#
+# Copyright may exist in Contributors' modifications
+# and/or contributions to the work.
+#
+# Use of this source code is governed by the MIT
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT.
+
 import copy
+import logging
+
+import numpy as np
 from scipy.spatial.transform import Rotation
 
 logger = logging.getLogger(__name__)
+
 
 def get_relevant_curvature(features):
     """Get the relevant curvature from features. Used to scale search sphere.
@@ -40,6 +51,7 @@ def get_relevant_curvature(features):
         # Return large curvature so we use an almost circular search sphere.
         curvatures = 10
     return curvatures
+
 
 def get_custom_distances(nearest_node_locs, search_locs, search_sns, search_curvature):
     """Calculate custom distances modulated by surface normal and curvature.
@@ -87,6 +99,7 @@ def get_custom_distances(nearest_node_locs, search_locs, search_sns, search_curv
     )
     return custom_nearest_node_dists
 
+
 def rotate_pose_dependent_features(features, ref_frame_rots) -> dict:
     """Rotate pose_vectors given a list of rotation matrices.
 
@@ -119,3 +132,4 @@ def rotate_pose_dependent_features(features, ref_frame_rots) -> dict:
         rotated_pv = rotated_pv.transpose((0, 2, 1))
     pose_transformed_features["pose_vectors"] = rotated_pv
     return pose_transformed_features
+
