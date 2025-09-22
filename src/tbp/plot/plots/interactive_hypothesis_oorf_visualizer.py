@@ -20,6 +20,7 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import logging
 import sys
 from pathlib import Path
@@ -39,9 +40,8 @@ from vedo import (
     settings,
 )
 
-from tbp.monty.frameworks.run_env import setup_env
-from tbp.monty.frameworks.utils.graph_matching_utils import get_custom_distances
-from tbp.monty.frameworks.utils.spatial_arithmetics import (
+from tbp.plot.plots.interactive_hypothesis_oorf_visualizer_utils.geometry import get_custom_distances
+from tbp.plot.plots.interactive_hypothesis_oorf_visualizer_utils.geometry import (
     rotate_pose_dependent_features,
 )
 
@@ -61,8 +61,6 @@ logger = logging.getLogger(__name__)
 
 settings.immediate_rendering = False
 settings.default_font = "Calco"
-
-setup_env()
 
 TBP_COLORS = {
     "black": "#000000",
@@ -857,8 +855,42 @@ class HypothesesOORFVisualizer:
             )
             self.plotter.at(self.main_renderer_ix).add(item)
 
+def setup_env(monty_logs_dir_default: str = "~/tbp/results/monty/"):
+    """Setup environment variables for Monty.
+
+    Args:
+        monty_logs_dir_default: Default directory for Monty logs.
+    """
+    monty_logs_dir = os.getenv("MONTY_LOGS")
+
+    if monty_logs_dir is None:
+        monty_logs_dir = monty_logs_dir_default
+        os.environ["MONTY_LOGS"] = monty_logs_dir
+        print(f"MONTY_LOGS not set. Using default directory: {monty_logs_dir}")
+
+    monty_models_dir = os.getenv("MONTY_MODELS")
+
+    if monty_models_dir is None:
+        monty_models_dir = f"{monty_logs_dir}pretrained_models/"
+        os.environ["MONTY_MODELS"] = monty_models_dir
+        print(f"MONTY_MODELS not set. Using default directory: {monty_models_dir}")
+
+    monty_data_dir = os.getenv("MONTY_DATA")
+
+    if monty_data_dir is None:
+        monty_data_dir = os.path.expanduser("~/tbp/data/")
+        os.environ["MONTY_DATA"] = monty_data_dir
+        print(f"MONTY_DATA not set. Using default directory: {monty_data_dir}")
+
+    wandb_dir = os.getenv("WANDB_DIR")
+
+    if wandb_dir is None:
+        wandb_dir = monty_logs_dir
+        os.environ["WANDB_DIR"] = wandb_dir
+        print(f"WANDB_DIR not set. Using default directory: {wandb_dir}")
+
 @register("interactive_hypothesis_oorf_visualizer", description="Interactive tool to visualize hypotheses' locations and rotations.")
-def plot_target_hypotheses(exp_path: Path, episode_id: int = 0) -> int:
+def main(experiment_log_dir: Path, episode_id: int = 0) -> int:
     """Plot target object hypotheses with interactive timestep slider.
 
     Args:
@@ -868,13 +900,14 @@ def plot_target_hypotheses(exp_path: Path, episode_id: int = 0) -> int:
     Returns:
         Exit code
     """
-    json_path = Path(exp_path) / "detailed_run_stats.json"
+    setup_env()
+    json_path = Path(experiment_log_dir) / "detailed_run_stats.json"
 
     if not json_path.exists():
         logger.error(f"Could not find detailed_run_stats.json at {json_path}")
         return 1
 
-    model_path = get_model_path(Path(exp_path))
+    model_path = get_model_path(Path(experiment_log_dir))
 
     visualizer = HypothesesOORFVisualizer(json_path, model_path, episode_id)
     visualizer.create_interactive_visualization()
@@ -882,37 +915,21 @@ def plot_target_hypotheses(exp_path: Path, episode_id: int = 0) -> int:
     return 0
 
 @attach_args("interactive_hypothesis_oorf_visualizer")
-def add_subparser(
-    subparsers: argparse._SubParsersAction,
-    parent_parser: argparse.ArgumentParser | None = None,
+def add_arguments(
+    parser: argparse.ArgumentParser,
 ) -> None:
-    """Add the hypothesis_oorf subparser to the main parser.
+    """Add the interactive_hypothesis_oorf_visualizer arguments to the main parser.
 
     Args:
-        subparsers: The subparsers object from the main parser.
-        parent_parser: Optional parent parser for shared arguments.
+        parser: The parser object from the main parser.
     """
-    parser = subparsers.add_parser(
-        "interactive_hypothesis_oorf_visualizer",
-        help="Interactive tool to visualize hypotheses' locations and rotations.",
-        parents=[parent_parser] if parent_parser else [],
-    )
     parser.add_argument(
         "experiment_log_dir",
         help="The directory containing the detailed_run_stats.json file.",
     )
-
     parser.add_argument(
         "--episode_id",
         type=int,
         default=0,
         help="The episode ID to visualize.",
-    )
-    parser.set_defaults(
-        func=lambda args: sys.exit(
-            plot_target_hypotheses(
-                args.experiment_log_dir,
-                args.episode_id,
-            )
-        )
     )

@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import torch
 
-from tbp.monty.frameworks.utils.graph_matching_utils import get_relevant_curvature
-from tbp.monty.frameworks.utils.logging_utils import deserialize_json_chunks
+from .geometry import get_relevant_curvature
+from tbp.plot.plots.stats import deserialize_json_chunks
 
 from .data_models import (
     ObjectModelForVisualization,
@@ -83,7 +83,7 @@ def load_object_model(
     Returns:
         The object model transformed to world frame.
     """
-    data = torch.load(model_path, map_location=torch.device("cpu"))
+    data = torch.load(model_path, map_location=torch.device("cpu"), weights_only=False)
     data = data["lm_dict"][lm_id]["graph_memory"][object_name][
         "patch"
     ]  # GraphObjectModel

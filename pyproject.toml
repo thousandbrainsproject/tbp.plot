@@ -19,6 +19,7 @@ dependencies = [
     "torch",
     "trimesh",
     "vedo",
+    "scipy>=1.16.2",
 ]
 description = "A visualization tool for plotting tbp.monty visualizations."
 dynamic = ["version"]
