@@ -312,23 +312,25 @@ def trace_hypothesis_backward(
     were removed and which were newly added.
 
     If `ix` corresponds to a newly added hypothesis at step `t`,
-    the hypothesis did not exist at step `t-1` → returns `None`.
+    the hypothesis did not exist at step `t-1` -> returns `None`.
     Otherwise, reinserts the slots removed in the transition
-    (t-1 → t), which shifts the index to the right by one for each
+    (t-1 -> t), which shifts the index to the right by one for each
     removed index less than or equal to it.
 
     Args:
         ix: Index of the hypothesis at step t.
         removed_ids: Sorted sequence of indices that were removed in
-            the transition (t-1 → t).
+            the transition (t-1 -> t).
         added_ids: Sorted sequence of indices that were newly added at step t.
 
     Returns:
         The index of the hypothesis at step (t-1), or `None` if the
         hypothesis was newly added at step t.
     """
-    ap = bisect_left(added_ids, ix)
-    if ap < len(added_ids) and added_ids[ap] == ix:
+    # NOTE: This is similar to checking `if ix in added_ids` but runs faster
+    # O(log n) because it makes use of the sorted list (binary search).
+    added_pos = bisect_left(added_ids, ix)
+    if added_pos < len(added_ids) and added_ids[added_pos] == ix:
         return None
 
     i_prev = ix
@@ -345,16 +347,16 @@ def trace_hypothesis_forward(ix: int, removed_ids: Iterable[int]) -> int | None:
 
     This function computes the index of a hypothesis at step `t+1` given
     its index at step `t`, using the list of indices removed during the
-    transition (t → t+1).
+    transition (t -> t+1).
 
-    If the current index `ix` is removed, the hypothesis ceases to exist → returns
+    If the current index `ix` is removed, the hypothesis ceases to exist -> returns
     `None`. Otherwise, the index shifts left by the number of removed indices less
     than `ix`.
 
     Args:
         ix: Index of the hypothesis at step t.
         removed_ids: Sorted sequence of indices that were removed in the
-            transition (t → t+1).
+            transition (t -> t+1).
 
     Returns:
         The index of the hypothesis at step (t+1), or `None` if the
