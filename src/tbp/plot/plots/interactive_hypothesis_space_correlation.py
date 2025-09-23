@@ -1185,6 +1185,9 @@ class CorrelationPlotWidgetOps:
                         "Rot_x": np.array(channel_data["rotations"])[removed_ids][:, 0],
                         "Rot_y": np.array(channel_data["rotations"])[removed_ids][:, 1],
                         "Rot_z": np.array(channel_data["rotations"])[removed_ids][:, 2],
+                        "Loc_x": np.array(channel_data["locations"])[removed_ids][:, 0],
+                        "Loc_y": np.array(channel_data["locations"])[removed_ids][:, 1],
+                        "Loc_z": np.array(channel_data["locations"])[removed_ids][:, 2],
                         "Pose Error": np.array(channel_data["pose_errors"])[
                             removed_ids
                         ],
@@ -1210,6 +1213,9 @@ class CorrelationPlotWidgetOps:
                         "Rot_x": np.array(channel_data["rotations"])[added_ids][:, 0],
                         "Rot_y": np.array(channel_data["rotations"])[added_ids][:, 1],
                         "Rot_z": np.array(channel_data["rotations"])[added_ids][:, 2],
+                        "Loc_x": np.array(channel_data["locations"])[added_ids][:, 0],
+                        "Loc_y": np.array(channel_data["locations"])[added_ids][:, 1],
+                        "Loc_z": np.array(channel_data["locations"])[added_ids][:, 2],
                         "Pose Error": np.array(channel_data["pose_errors"])[added_ids],
                         "age": np.array(updater_data["ages"])[added_ids],
                         "kind": "Added",
@@ -1237,6 +1243,15 @@ class CorrelationPlotWidgetOps:
                             :, 1
                         ],
                         "Rot_z": np.array(channel_data["rotations"])[maintained_ids][
+                            :, 2
+                        ],
+                        "Loc_x": np.array(channel_data["locations"])[maintained_ids][
+                            :, 0
+                        ],
+                        "Loc_y": np.array(channel_data["locations"])[maintained_ids][
+                            :, 1
+                        ],
+                        "Loc_z": np.array(channel_data["locations"])[maintained_ids][
                             :, 2
                         ],
                         "Pose Error": np.array(channel_data["pose_errors"])[
@@ -1524,6 +1539,7 @@ class HypothesisMeshWidgetOps:
             ),
         ]
         self.default_object_position = (0, 1.5, 0)
+        self.sensor_circle: Circle | None = None
 
         self.plotter.at(2).add(Text2D(txt="Selected Hypothesis", pos="top-center"))
 
@@ -1541,6 +1557,10 @@ class HypothesisMeshWidgetOps:
         """
         if widget is not None:
             self.plotter.at(2).remove(widget)
+
+        if self.sensor_circle is not None:
+            self.plotter.at(2).remove(self.sensor_circle)
+            self.sensor_circle = None
 
         self.plotter.at(2).render()
         return widget, False
@@ -1573,10 +1593,15 @@ class HypothesisMeshWidgetOps:
         widget.rotate_y(hypothesis["Rot_y"])
         widget.rotate_z(hypothesis["Rot_z"])
         widget.shift(self.default_object_position)
-
         self.plotter.at(2).add(widget)
-        self.plotter.at(2).render()
 
+        # Add sensor circle
+        sensor_pos = (hypothesis["Loc_x"], hypothesis["Loc_y"], hypothesis["Loc_z"])
+        self.sensor_circle = Sphere(pos=sensor_pos, r=0.002).c("green")
+        self.sensor_circle.pos(sensor_pos)
+        self.plotter.at(2).add(self.sensor_circle)
+
+        self.plotter.at(2).render()
         return widget, False
 
 
