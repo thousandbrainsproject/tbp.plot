@@ -1,0 +1,44 @@
+{
+    "episode_1": [
+        {
+            "evidence": 0.15,
+            "pose_error": 18.0
+        },
+        {
+            "evidence": 0.42,
+            "pose_error": 14.5
+        },
+        {
+            "evidence": 0.60,
+            "pose_error": 11.2
+        }
+    ],
+    "episode_2": [
+        {
+            "evidence": 0.05,
+            "pose_error": 22.1
+        },
+        {
+            "evidence": 0.20,
+            "pose_error": 19.8
+        },
+        {
+            "evidence": 0.35,
+            "pose_error": 16.0
+        },
+        {
+            "evidence": 0.50,
+            "pose_error": 12.7
+        }
+    ],
+    "episode_3": [
+        {
+            "evidence": 0.10,
+            "pose_error": 21.5
+        },
+        {
+            "evidence": 0.28,
+            "pose_error": 17.9
+        }
+    ]
+}
