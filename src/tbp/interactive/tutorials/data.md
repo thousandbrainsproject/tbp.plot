@@ -111,13 +111,13 @@ loc_partial = DataLocator([
 ])
 ```
 
-3.1) What episodes are available?
+**What episodes are available?**
 
 ```python
 parser.query(loc_partial) # returns ["episode_1", "episode_2", "episode_3"]
 ```
 
-3.2) What step indices exist for a given episode?
+**What step indices exist for a given episode?**
 
 ```python
 parser.query(loc_partial, episode="episode_1") # returns [0,1,2]
