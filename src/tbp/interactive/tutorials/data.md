@@ -129,7 +129,7 @@ parser.query(loc_partial, episode="episode_2") # returns [0,1,2,3]
 
 For longer paths, `DataLocator`s can be easily extended.
 You can compose locators by starting general and then extending them.
-This keeps the code modular and allows you progressively specialize a path.
+This keeps the code modular and allows you to progressively specialize a path.
 
 ```python
 episode_locator = DataLocator([DataLocatorStep.key("episode", value="episode_3")])
