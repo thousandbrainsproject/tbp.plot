@@ -38,6 +38,12 @@ class WidgetUpdater[WidgetT]:
     The callback decides how to update the widget and whether to publish
     the new state. It must return a tuple ``(widget, publish_state)``.
 
+    Note that the topics defined in `TopicSpec` do not automatically initialize
+    or subscribe to topics. The `Widget` class iterates over all the `TopicSpec`s
+    in all the `WidgetUpdater`s and subscribes to the topics. A `TopicSpec` is used
+    here only to determine which topics the updater needs to wait on before triggering
+    the callback function.
+
     Args:
         topics: Iterable of TopicSpec. Required topics gate readiness.
         callback: Called as callback(widget, inbox_list) when ready.
