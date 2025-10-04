@@ -11,7 +11,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from tbp.interactive.generics import W
 from tbp.interactive.topics import TopicMessage, TopicSpec
 
 if TYPE_CHECKING:
@@ -19,16 +18,16 @@ if TYPE_CHECKING:
 
 
 @runtime_checkable
-class WidgetUpdaterProto(Protocol[W]):
+class WidgetUpdaterProto[WidgetT](Protocol):
     topics: Iterable[TopicSpec]
 
     def __call__(
-        self, widget: W | None, msg: TopicMessage
-    ) -> tuple[W | None, bool]: ...
+        self, widget: WidgetT | None, msg: TopicMessage
+    ) -> tuple[WidgetT | None, bool]: ...
 
 
 @dataclass
-class WidgetUpdater:
+class WidgetUpdater[WidgetT]:
     """Collect messages for a set of topics and callback when required topics are ready.
 
     The updater maintains an inbox keyed by topic name. Each time a message
@@ -52,7 +51,9 @@ class WidgetUpdater:
     """
 
     topics: Iterable[TopicSpec]
-    callback: Callable
+    callback: Callable[
+        [WidgetT | None, list[TopicMessage]], tuple[WidgetT | None, bool]
+    ]
 
     _inbox: dict[str, TopicMessage] = field(default_factory=dict, init=False)
 
@@ -79,7 +80,9 @@ class WidgetUpdater:
         """
         return any(spec.name == msg.name for spec in self.topics)
 
-    def __call__(self, widget: W | None, msg: TopicMessage) -> tuple[W | None, bool]:
+    def __call__(
+        self, widget: WidgetT | None, msg: TopicMessage
+    ) -> tuple[WidgetT | None, bool]:
         """Record a message and invoke the callback if all required topics are ready.
 
         Args:

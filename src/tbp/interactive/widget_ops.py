@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from tbp.interactive.generics import S, W
 from tbp.interactive.topics import TopicMessage
 from tbp.interactive.widget_updaters import WidgetUpdaterProto
 
@@ -24,30 +23,30 @@ class WidgetOpsProto(Protocol):
 
 
 @runtime_checkable
-class SupportsAdd(Protocol[W]):
-    def add(self, callback: Callable[[W, str], None]) -> W: ...
+class SupportsAdd[WidgetT](Protocol):
+    def add(self, callback: Callable[[WidgetT, str], None]) -> WidgetT: ...
 
 
 @runtime_checkable
-class SupportsRemove(Protocol[W]):
-    def remove(self, widget: W) -> None: ...
+class SupportsRemove[WidgetT](Protocol):
+    def remove(self, widget: WidgetT) -> None: ...
 
 
 @runtime_checkable
-class SupportsExtractState(Protocol[W, S]):
-    def extract_state(self, widget: W | None) -> S | None: ...
+class SupportsExtractState[WidgetT, StateT](Protocol):
+    def extract_state(self, widget: WidgetT | None) -> StateT | None: ...
 
 
 @runtime_checkable
-class SupportsSetState(Protocol[W, S]):
-    def set_state(self, widget: W | None, value: S | None) -> None: ...
+class SupportsSetState[WidgetT, StateT](Protocol):
+    def set_state(self, widget: WidgetT | None, value: StateT | None) -> None: ...
 
 
 @runtime_checkable
-class HasStateToMessages(Protocol[S]):
-    def state_to_messages(self, state: S | None) -> Iterable[TopicMessage]: ...
+class HasStateToMessages[StateT](Protocol):
+    def state_to_messages(self, state: StateT | None) -> Iterable[TopicMessage]: ...
 
 
 @runtime_checkable
-class HasUpdaters(Protocol[W]):
-    updaters: Iterable[WidgetUpdaterProto[W]]
+class HasUpdaters[WidgetT](Protocol):
+    updaters: Iterable[WidgetUpdaterProto[WidgetT]]

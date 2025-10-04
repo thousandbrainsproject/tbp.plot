@@ -11,14 +11,16 @@ from __future__ import annotations
 
 import time
 from bisect import bisect_left
-from collections.abc import Callable, Hashable, Iterable
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
 from vedo.vtkclasses import vtkRenderWindowInteractor
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Hashable, Iterable
 
 
 @dataclass
