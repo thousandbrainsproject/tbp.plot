@@ -2247,20 +2247,22 @@ class InteractivePlot:
 
         self.plotter.at(0).show(
             camera=deepcopy(self.cam_dict),
-            interactive=False,
+            interactive=False,  # Must be set to False if not the last `show` call
             resetcam=False,
         )
         self.plotter.at(1).show(
             axes=deepcopy(self.axes_dict),
-            interactive=False,
+            interactive=False,  # Must be set to False if not the last `show` call
             resetcam=True,
         )
 
         self.plotter.at(2).show(
             axes=deepcopy(self.axes_dict),
-            interactive=True,
+            interactive=True,  # Must be set to True on the last `show` call
             resetcam=True,
         )
+
+        # === No code runs after the last interactive call === #
 
     def create_widgets(self):
         widgets = {}
