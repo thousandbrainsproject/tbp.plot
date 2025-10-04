@@ -350,7 +350,7 @@ class GtMeshWidgetOps:
         self._locators = self.create_locators()
 
         self.gaze_line: Line | None = None
-        self.sensor_circle: Circle | None = None
+        self.sensor_sphere: Sphere | None = None
 
         self.plotter.at(1).add(Text2D(txt="Ground Truth", pos="top-center"))
 
@@ -470,10 +470,10 @@ class GtMeshWidgetOps:
             step=step_number,
         )
 
-        if self.sensor_circle is None:
-            self.sensor_circle = Sphere(pos=sensor_pos, r=0.002)
-            self.plotter.at(1).add(self.sensor_circle)
-        self.sensor_circle.pos(sensor_pos)
+        if self.sensor_sphere is None:
+            self.sensor_sphere = Sphere(pos=sensor_pos, r=0.002)
+            self.plotter.at(1).add(self.sensor_sphere)
+        self.sensor_sphere.pos(sensor_pos)
 
         if self.gaze_line is None:
             self.gaze_line = Line(sensor_pos, patch_pos, c="black", lw=2)
