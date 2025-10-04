@@ -210,11 +210,11 @@ class TraceHypothesisBackwardTests(unittest.TestCase):
         self.assertIsNone(trace_hypothesis_backward(0, [], [0]))
 
         # 4 exists in added_ids
-        self.assertIsNone(trace_hypothesis_backward(4, [1, 2], [0, 4, 10]))
+        self.assertIsNone(trace_hypothesis_backward(4, [1, 2], [4, 8, 10]))
 
     def test_added_present_but_ix_not_added(self) -> None:
         # 1 and 2 were removed at t, so reinserting shifts right by 2
-        self.assertEqual(trace_hypothesis_backward(4, [1, 2], [0, 10]), 6)
+        self.assertEqual(trace_hypothesis_backward(4, [1, 2], [5, 10]), 6)
 
     def test_boundary_removal_at_zero(self) -> None:
         self.assertEqual(trace_hypothesis_backward(0, [0], []), 1)

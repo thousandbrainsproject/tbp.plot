@@ -317,6 +317,12 @@ def trace_hypothesis_backward(
     (t-1 -> t), which shifts the index to the right by one for each
     removed index less than or equal to it.
 
+    Note: This assumes that `added_ids` are always appended to the end of
+    the hypotheses at `t-1`, therefore cannot shift the tracked index when
+    tracing backwards. This simplifies the computations as we only need to
+    check if the tracked index is in the `added_ids` or not, but we do not need
+    to shift the tracked index based on `added_ids`.
+
     Args:
         ix: Index of the hypothesis at step t.
         removed_ids: Sorted sequence of indices that were removed in
