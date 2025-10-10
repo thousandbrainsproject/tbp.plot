@@ -200,6 +200,8 @@ class TraceHypothesisBackwardTests(unittest.TestCase):
         self.assertEqual(trace_hypothesis_backward(7, [0, 3, 10], []), 9)
 
         # 0, 3 and 9 count.
+        # I.e. ~0~, 1, 2, ~3~, 4, 5, 6, 7, 8, ~9~, 10 -> 0, 1, 2, 3, 4, 5, 6, 7
+        # where ~x~ indicates deletion of the number x
         self.assertEqual(trace_hypothesis_backward(7, [0, 3, 9], []), 10)
 
         # 0, 1 and 2 count.
