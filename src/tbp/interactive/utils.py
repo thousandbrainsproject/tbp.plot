@@ -41,6 +41,9 @@ class Location2D:
             return self.x == other.x and self.y == other.y
         return False
 
+    def __hash__(self) -> int:
+        return hash((self.x, self.y))
+
     def to_3d(self, z: float) -> Location3D:
         """Create a 3D location by adding a z coordinate.
 
@@ -80,6 +83,9 @@ class Location3D:
         if other.__class__ is self.__class__:
             return self.x == other.x and self.y == other.y and self.z == other.z
         return False
+
+    def __hash__(self) -> int:
+        return hash((self.x, self.y, self.z))
 
     def to_2d(self) -> Location2D:
         """Drop the z coordinate and return a 2D location.
