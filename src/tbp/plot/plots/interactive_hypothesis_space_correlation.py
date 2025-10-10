@@ -1539,7 +1539,7 @@ class HypothesisMeshWidgetOps:
             ),
         ]
         self.default_object_position = (0, 1.5, 0)
-        self.sensor_circle: Circle | None = None
+        self.sensor_sphere: Sphere | None = None
 
         self.plotter.at(2).add(Text2D(txt="Selected Hypothesis", pos="top-center"))
 
@@ -1558,9 +1558,9 @@ class HypothesisMeshWidgetOps:
         if widget is not None:
             self.plotter.at(2).remove(widget)
 
-        if self.sensor_circle is not None:
-            self.plotter.at(2).remove(self.sensor_circle)
-            self.sensor_circle = None
+        if self.sensor_sphere is not None:
+            self.plotter.at(2).remove(self.sensor_sphere)
+            self.sensor_sphere = None
 
         self.plotter.at(2).render()
         return widget, False
@@ -1597,9 +1597,9 @@ class HypothesisMeshWidgetOps:
 
         # Add sensor circle
         sensor_pos = (hypothesis["Loc_x"], hypothesis["Loc_y"], hypothesis["Loc_z"])
-        self.sensor_circle = Sphere(pos=sensor_pos, r=0.002).c("green")
-        self.sensor_circle.pos(sensor_pos)
-        self.plotter.at(2).add(self.sensor_circle)
+        self.sensor_sphere = Sphere(pos=sensor_pos, r=0.002).c("green")
+        self.sensor_sphere.pos(sensor_pos)
+        self.plotter.at(2).add(self.sensor_sphere)
 
         self.plotter.at(2).render()
         return widget, False
