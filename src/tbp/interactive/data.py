@@ -195,7 +195,7 @@ class DataLocatorStep:
     """One step in a data locator path.
 
     Note: The name attribute can be arbitrary, but it should be descriptive and
-    memorable because it could be used to reference the `DataLocatorStep`  when
+    memorable because it is used to reference the `DataLocatorStep`  when
     updating its value in the `DataParser.extract` and `DataParser.query` functions.
 
     Attributes:
