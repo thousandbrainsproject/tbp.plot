@@ -350,7 +350,7 @@ class GtMeshWidgetOps:
         self._locators = self.create_locators()
 
         self.gaze_line: Line | None = None
-        self.sensor_circle: Circle | None = None
+        self.sensor_sphere: Sphere | None = None
 
         self.plotter.at(1).add(Text2D(txt="Ground Truth", pos="top-center"))
 
@@ -470,10 +470,10 @@ class GtMeshWidgetOps:
             step=step_number,
         )
 
-        if self.sensor_circle is None:
-            self.sensor_circle = Sphere(pos=sensor_pos, r=0.002)
-            self.plotter.at(1).add(self.sensor_circle)
-        self.sensor_circle.pos(sensor_pos)
+        if self.sensor_sphere is None:
+            self.sensor_sphere = Sphere(pos=sensor_pos, r=0.002)
+            self.plotter.at(1).add(self.sensor_sphere)
+        self.sensor_sphere.pos(sensor_pos)
 
         if self.gaze_line is None:
             self.gaze_line = Line(sensor_pos, patch_pos, c="black", lw=2)
@@ -2272,20 +2272,22 @@ class InteractivePlot:
 
         self.plotter.at(0).show(
             camera=deepcopy(self.cam_dict),
-            interactive=False,
+            interactive=False,  # Must be set to False if not the last `show` call
             resetcam=False,
         )
         self.plotter.at(1).show(
             axes=deepcopy(self.axes_dict),
-            interactive=False,
+            interactive=False,  # Must be set to False if not the last `show` call
             resetcam=True,
         )
 
         self.plotter.at(2).show(
             axes=deepcopy(self.axes_dict),
-            interactive=True,
+            interactive=True,  # Must be set to True on the last `show` call
             resetcam=True,
         )
+
+        # === No code runs after the last interactive call === #
 
     def create_widgets(self):
         widgets = {}
