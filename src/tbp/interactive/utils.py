@@ -11,14 +11,16 @@ from __future__ import annotations
 
 import time
 from bisect import bisect_left
-from collections.abc import Callable, Hashable, Iterable
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
 from vedo.vtkclasses import vtkRenderWindowInteractor
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Hashable, Iterable
 
 
 @dataclass
@@ -38,6 +40,9 @@ class Location2D:
         if other.__class__ is self.__class__:
             return self.x == other.x and self.y == other.y
         return False
+
+    def __hash__(self) -> int:
+        return hash((self.x, self.y))
 
     def to_3d(self, z: float) -> Location3D:
         """Create a 3D location by adding a z coordinate.
@@ -78,6 +83,9 @@ class Location3D:
         if other.__class__ is self.__class__:
             return self.x == other.x and self.y == other.y and self.z == other.z
         return False
+
+    def __hash__(self) -> int:
+        return hash((self.x, self.y, self.z))
 
     def to_2d(self) -> Location2D:
         """Drop the z coordinate and return a 2D location.
@@ -316,6 +324,12 @@ def trace_hypothesis_backward(
     Otherwise, reinserts the slots removed in the transition
     (t-1 -> t), which shifts the index to the right by one for each
     removed index less than or equal to it.
+
+    Note: This assumes that `added_ids` are always appended to the end of
+    the hypotheses at `t-1`, therefore cannot shift the tracked index when
+    tracing backwards. This simplifies the computations as we only need to
+    check if the tracked index is in the `added_ids` or not, but we do not need
+    to shift the tracked index based on `added_ids`.
 
     Args:
         ix: Index of the hypothesis at step t.

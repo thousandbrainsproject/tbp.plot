@@ -183,57 +183,83 @@ class CoordinateMapperTests(unittest.TestCase):
 
 class TraceHypothesisBackwardTests(unittest.TestCase):
     def test_no_changes_returns_same(self) -> None:
-        self.assertEqual(trace_hypothesis_backward(0, [], []), 0)
-        self.assertEqual(trace_hypothesis_backward(5, [], []), 5)
+        self.assertEqual(
+            trace_hypothesis_backward(ix=0, removed_ids=[], added_ids=[]), 0
+        )
+        self.assertEqual(
+            trace_hypothesis_backward(ix=5, removed_ids=[], added_ids=[]), 5
+        )
 
     def test_single_removal_before_ix(self) -> None:
-        self.assertEqual(trace_hypothesis_backward(5, [2], []), 6)
+        self.assertEqual(
+            trace_hypothesis_backward(ix=5, removed_ids=[2], added_ids=[]), 6
+        )
 
     def test_single_removal_equal_ix(self) -> None:
-        self.assertEqual(trace_hypothesis_backward(5, [5], []), 6)
+        self.assertEqual(
+            trace_hypothesis_backward(ix=5, removed_ids=[5], added_ids=[]), 6
+        )
 
     def test_single_removal_after_ix(self) -> None:
-        self.assertEqual(trace_hypothesis_backward(5, [6], []), 5)
+        self.assertEqual(
+            trace_hypothesis_backward(ix=5, removed_ids=[6], added_ids=[]), 5
+        )
 
     def test_multiple_removals_only_leq_ix_shift(self) -> None:
         # 0 and 3 count, 10 does not.
-        self.assertEqual(trace_hypothesis_backward(7, [0, 3, 10], []), 9)
+        self.assertEqual(
+            trace_hypothesis_backward(ix=7, removed_ids=[0, 3, 10], added_ids=[]), 9
+        )
 
         # 0, 3 and 9 count.
-        self.assertEqual(trace_hypothesis_backward(7, [0, 3, 9], []), 10)
+        # I.e. ~0~, 1, 2, ~3~, 4, 5, 6, 7, 8, ~9~, 10 -> 0, 1, 2, 3, 4, 5, 6, 7
+        # where ~x~ indicates deletion of the number x
+        self.assertEqual(
+            trace_hypothesis_backward(ix=7, removed_ids=[0, 3, 9], added_ids=[]), 10
+        )
 
         # 0, 1 and 2 count.
-        self.assertEqual(trace_hypothesis_backward(3, [0, 1, 2], []), 6)
+        self.assertEqual(
+            trace_hypothesis_backward(ix=3, removed_ids=[0, 1, 2], added_ids=[]), 6
+        )
 
     def test_newly_added_returns_none(self) -> None:
         # 0 exists in added_ids
-        self.assertIsNone(trace_hypothesis_backward(0, [], [0]))
+        self.assertIsNone(
+            trace_hypothesis_backward(ix=0, removed_ids=[], added_ids=[0])
+        )
 
         # 4 exists in added_ids
-        self.assertIsNone(trace_hypothesis_backward(4, [1, 2], [0, 4, 10]))
+        self.assertIsNone(
+            trace_hypothesis_backward(ix=4, removed_ids=[1, 2], added_ids=[4, 5, 6])
+        )
 
     def test_added_present_but_ix_not_added(self) -> None:
         # 1 and 2 were removed at t, so reinserting shifts right by 2
-        self.assertEqual(trace_hypothesis_backward(4, [1, 2], [0, 10]), 6)
+        self.assertEqual(
+            trace_hypothesis_backward(ix=4, removed_ids=[1, 2], added_ids=[5, 6]), 6
+        )
 
     def test_boundary_removal_at_zero(self) -> None:
-        self.assertEqual(trace_hypothesis_backward(0, [0], []), 1)
+        self.assertEqual(
+            trace_hypothesis_backward(ix=0, removed_ids=[0], added_ids=[]), 1
+        )
 
 
 class TraceHypothesisForwardTests(unittest.TestCase):
     def test_no_removals_returns_same(self) -> None:
         """Test no removals returns the same index."""
-        self.assertEqual(trace_hypothesis_forward(0, []), 0)
-        self.assertEqual(trace_hypothesis_forward(5, []), 5)
+        self.assertEqual(trace_hypothesis_forward(ix=0, removed_ids=[]), 0)
+        self.assertEqual(trace_hypothesis_forward(ix=5, removed_ids=[]), 5)
 
     def test_removed_index_returns_none(self) -> None:
-        self.assertIsNone(trace_hypothesis_forward(0, [0]))
-        self.assertIsNone(trace_hypothesis_forward(3, [1, 3, 7]))
+        self.assertIsNone(trace_hypothesis_forward(ix=0, removed_ids=[0]))
+        self.assertIsNone(trace_hypothesis_forward(ix=3, removed_ids=[1, 3, 7]))
 
     def test_shift_left_by_removed_less_than_ix(self) -> None:
-        self.assertEqual(trace_hypothesis_forward(5, [1]), 4)
-        self.assertEqual(trace_hypothesis_forward(5, [1, 3, 4]), 2)
-        self.assertEqual(trace_hypothesis_forward(2, [0, 10]), 1)
+        self.assertEqual(trace_hypothesis_forward(ix=5, removed_ids=[1]), 4)
+        self.assertEqual(trace_hypothesis_forward(ix=5, removed_ids=[1, 3, 4]), 2)
+        self.assertEqual(trace_hypothesis_forward(ix=2, removed_ids=[0, 10]), 1)
 
     def test_removed_higher_than_ix_returns_same(self) -> None:
-        self.assertEqual(trace_hypothesis_forward(0, [1, 2, 3]), 0)
+        self.assertEqual(trace_hypothesis_forward(ix=0, removed_ids=[1, 2, 3]), 0)

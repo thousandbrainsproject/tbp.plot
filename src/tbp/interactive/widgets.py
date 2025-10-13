@@ -9,12 +9,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Generic
+from typing import Any
 
 from pubsub.core import Publisher
 from vedo import Button, Slider2D
 
-from tbp.interactive.generics import S, W
 from tbp.interactive.topics import TopicMessage
 from tbp.interactive.utils import VtkDebounceScheduler
 from tbp.interactive.widget_ops import (
@@ -96,7 +95,7 @@ def set_button_state(widget: Button, value: str | int):
     widget.status(idx)
 
 
-class Widget(Generic[W, S]):
+class Widget[WidgetT, StateT]:
     """High-level wrapper that connects a Vedo widget to a pubsub topic.
 
     The widget is created via `widget_ops.add` and removed via
@@ -122,12 +121,12 @@ class Widget(Generic[W, S]):
     def __init__(
         self,
         widget_ops: (
-            SupportsAdd[W]
-            | SupportsRemove[W]
-            | SupportsExtractState[W, S]
-            | SupportsSetState[W, S]
-            | HasStateToMessages[S]
-            | HasUpdaters[W]
+            SupportsAdd[WidgetT]
+            | SupportsRemove[WidgetT]
+            | SupportsExtractState[WidgetT, StateT]
+            | SupportsSetState[WidgetT, StateT]
+            | HasStateToMessages[StateT]
+            | HasUpdaters[WidgetT]
             | WidgetOpsProto
         ),
         bus: Publisher,
@@ -141,9 +140,9 @@ class Widget(Generic[W, S]):
         self.dedupe = dedupe
         self.widget_ops = widget_ops
 
-        self.widget: W | None = None
-        self.state: S | None = None
-        self.last_published_state: S | None = None
+        self.widget: WidgetT | None = None
+        self.state: StateT | None = None
+        self.last_published_state: StateT | None = None
         self._sched_key = object()  # hashable unique key
 
         if isinstance(self.widget_ops, HasUpdaters):
@@ -182,7 +181,7 @@ class Widget(Generic[W, S]):
             self.widget_ops.remove(self.widget)
         self.widget = None
 
-    def extract_state(self) -> S | None:
+    def extract_state(self) -> StateT | None:
         """Read the current state from the widget via `widget_ops`.
 
         Returns:
@@ -192,7 +191,7 @@ class Widget(Generic[W, S]):
             return self.widget_ops.extract_state(self.widget)
         return None
 
-    def set_state(self, value: S, publish: bool = True) -> None:
+    def set_state(self, value: StateT, publish: bool = True) -> None:
         """Set the widget state and optionally schedule a publish.
 
         Args:
@@ -207,7 +206,7 @@ class Widget(Generic[W, S]):
         if publish:
             self.scheduler.schedule_once(self._sched_key, self.debounce_sec)
 
-    def _on_change(self, widget: W, _event: str) -> None:
+    def _on_change(self, widget: WidgetT, _event: str) -> None:
         """Internal callback when the underlying widget reports a UI change.
 
         When a widget value changes from the UI (e.g., slider moved or button
@@ -238,7 +237,7 @@ class Widget(Generic[W, S]):
         """Handler fired by the scheduler to publish debounced state."""
         self._publish(self.extract_state())
 
-    def _publish(self, state: S | None) -> None:
+    def _publish(self, state: StateT | None) -> None:
         """Publish the state to the pubsub topic if not a duplicate.
 
         Args:
