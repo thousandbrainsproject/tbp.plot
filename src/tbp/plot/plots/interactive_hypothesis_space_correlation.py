@@ -1595,7 +1595,7 @@ class HypothesisMeshWidgetOps:
         widget.shift(self.default_object_position)
         self.plotter.at(2).add(widget)
 
-        # Add sensor circle
+        # Add sphere for sensor's hypothesized location
         sensor_pos = (hypothesis["Loc_x"], hypothesis["Loc_y"], hypothesis["Loc_z"])
         self.sensor_sphere = Sphere(pos=sensor_pos, r=0.002).c("green")
         self.sensor_sphere.pos(sensor_pos)
