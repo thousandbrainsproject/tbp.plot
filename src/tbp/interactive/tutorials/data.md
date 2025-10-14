@@ -68,7 +68,11 @@ loc_full = DataLocator([
     DataLocatorStep.key("field", value="evidence"),     # dict key inside the step dict
 ])
 ```
-Then we can extract the data from the `DataParser`:
+
+A `DataLocator` is created using an ordered list of `DataLocatorStep` instances.
+Each `DataLocatorStep` points to a single step in the data path, distinct from a step in an episode.
+
+We can extract the data from the `DataParser`:
 ```python
 parser.extract(loc_full) # returns 0.5
 ```
