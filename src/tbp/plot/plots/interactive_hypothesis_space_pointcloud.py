@@ -565,8 +565,9 @@ class GtMeshWidgetOps:
         self, widget: None, msgs: list[TopicMessage]
     ) -> tuple[None, bool]:
         msgs_dict = {msg.name: msg.value for msg in msgs}
-        widget.alpha(1.0 - msgs_dict["transparency_value"])
-        self.plotter.at(1).render()
+        if widget is not None:
+            widget.alpha(1.0 - msgs_dict["transparency_value"])
+            self.plotter.at(1).render()
         return widget, False
 
 
