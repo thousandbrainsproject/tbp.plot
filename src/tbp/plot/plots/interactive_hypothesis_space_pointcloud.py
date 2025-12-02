@@ -611,7 +611,7 @@ class AgentPathButtonWidgetOps:
         self.plotter = plotter
 
         self._add_kwargs = {
-            "pos": (0.15, 0.98),
+            "pos": (0.16, 0.98),
             "states": ["Agent Path: On", "Agent Path: Off"],
             "c": ["w", "w"],
             "bc": ["dg", "dr"],
@@ -650,7 +650,7 @@ class PatchPathButtonWidgetOps:
         self.plotter = plotter
 
         self._add_kwargs = {
-            "pos": (0.35, 0.98),
+            "pos": (0.37, 0.98),
             "states": ["Patch Path: On", "Patch Path: Off"],
             "c": ["w", "w"],
             "bc": ["dg", "dr"],
@@ -869,7 +869,7 @@ class ModelButtonWidgetOps:
         self.plotter = plotter
 
         self._add_kwargs = {
-            "pos": (0.62, 0.98),
+            "pos": (0.63, 0.98),
             "states": ["Pretrained Model: On", "Pretrained Model: Off"],
             "c": ["w", "w"],
             "bc": ["dg", "dr"],
