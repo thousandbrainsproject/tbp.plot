@@ -272,7 +272,7 @@ class GtMeshWidgetOps:
             WidgetUpdater(
                 topics=[
                     TopicSpec("episode_number", required=True),
-                    TopicSpec("alpha_value", required=True),
+                    TopicSpec("transparency_value", required=True),
                 ],
                 callback=self.update_mesh,
             ),
@@ -301,9 +301,9 @@ class GtMeshWidgetOps:
             ),
             WidgetUpdater(
                 topics=[
-                    TopicSpec("alpha_value", required=True),
+                    TopicSpec("transparency_value", required=True),
                 ],
-                callback=self.update_alpha,
+                callback=self.update_transparency,
             ),
         ]
         self._locators = self.create_locators()
@@ -395,7 +395,7 @@ class GtMeshWidgetOps:
         widget.rotate_y(target_rot[1])
         widget.rotate_z(target_rot[2])
         widget.shift(*target_pos)
-        widget.alpha(msgs_dict["alpha_value"])
+        widget.alpha(1.0 - msgs_dict["transparency_value"])
 
         self.plotter.at(1).add(widget)
         self.plotter.at(1).render()
@@ -552,18 +552,21 @@ class GtMeshWidgetOps:
         self.plotter.at(1).render()
         return widget, False
 
-    def update_alpha(self, widget: None, msgs: list[TopicMessage]) -> tuple[None, bool]:
+    def update_transparency(
+        self, widget: None, msgs: list[TopicMessage]
+    ) -> tuple[None, bool]:
         msgs_dict = {msg.name: msg.value for msg in msgs}
-        widget.alpha(msgs_dict["alpha_value"])
+        widget.alpha(1.0 - msgs_dict["transparency_value"])
         self.plotter.at(1).render()
         return widget, False
 
 
-class AlphaSliderWidgetOps:
-    """WidgetOps implementation for the alpha transparency slider.
+class TransparencySliderWidgetOps:
+    """WidgetOps implementation for the transparency slider.
 
     This widget provides a slider to control the transparency of the mesh
-    object. It publishes on the topic `alpha_value` a float value between 0.0 and 1.0.
+    object. It publishes on the topic `transparency_value` a float value between 0.0
+    and 1.0.
     """
 
     def __init__(self, plotter: Plotter) -> None:
@@ -572,9 +575,9 @@ class AlphaSliderWidgetOps:
         self._add_kwargs = {
             "xmin": 0.0,
             "xmax": 1.0,
-            "value": 1.0,
+            "value": 0.0,
             "pos": [(0.05, 0.0), (0.05, 0.4)],
-            "title": "Alpha",
+            "title": "Mesh Transparency",
             "title_size": 2,
             "slider_width": 0.04,
             "tube_width": 0.015,
@@ -593,7 +596,7 @@ class AlphaSliderWidgetOps:
         set_slider_state(widget, value)
 
     def state_to_messages(self, state: float) -> Iterable[TopicMessage]:
-        return [TopicMessage(name="alpha_value", value=state)]
+        return [TopicMessage(name="transparency_value", value=state)]
 
 
 class SensorPathButtonWidgetOps:
@@ -1314,7 +1317,7 @@ class InteractivePlot:
     """An interactive plot for hypotheses and sampling bursts location.
 
     This visualizations features the following:
-    - A plot of the primary target mesh (with alpha transparency slider) with the agent
+    - A plot of the primary target mesh (with mesh transparency slider) with the agent
         and patch location on the object.
     - Buttons to activate or deactivate the history of agent and/or patch locations.
     - A plot of the pretrained model for the primary target with a button to show the
@@ -1378,7 +1381,7 @@ class InteractivePlot:
         self._widgets["step_slider"].set_state(0)
         self._widgets["sensor_path_button"].set_state("No Sensor Path")
         self._widgets["patch_path_button"].set_state("No Patch Path")
-        self._widgets["alpha_slider"].set_state(1.0)
+        self._widgets["transparency_slider"].set_state(0.0)
         self._widgets["model_button"].set_state("Model")
         self._widgets["hyp_color_button"].set_state("None")
         self._widgets["hyp_scope_button"].set_state("No Hypotheses")
@@ -1429,8 +1432,8 @@ class InteractivePlot:
             dedupe=True,
         )
 
-        widgets["alpha_slider"] = Widget[Slider2D, float](
-            widget_ops=AlphaSliderWidgetOps(
+        widgets["transparency_slider"] = Widget[Slider2D, float](
+            widget_ops=TransparencySliderWidgetOps(
                 plotter=self.plotter,
             ),
             bus=self.event_bus,
