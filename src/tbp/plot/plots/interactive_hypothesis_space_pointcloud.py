@@ -21,6 +21,7 @@ import pandas as pd
 from pubsub.core import Publisher
 from vedo import Button, Image, Line, Mesh, Plotter, Points, Slider2D, Sphere
 
+from tbp.interactive.colors import Palette
 from tbp.interactive.data import (
     DataLocator,
     DataLocatorStep,
@@ -437,12 +438,16 @@ class GtMeshWidgetOps:
         )
 
         if self.agent_sphere is None:
-            self.agent_sphere = Sphere(pos=agent_pos, r=0.004)
+            self.agent_sphere = Sphere(
+                pos=agent_pos, r=0.004, c=Palette.as_hex("vivid_violet")
+            )
             self.plotter.at(1).add(self.agent_sphere)
         self.agent_sphere.pos(agent_pos)
 
         if self.gaze_line is None:
-            self.gaze_line = Line(agent_pos, patch_pos, c="black", lw=4)
+            self.gaze_line = Line(
+                agent_pos, patch_pos, c=Palette.as_hex("rich_black"), lw=4
+            )
             self.plotter.at(1).add(self.gaze_line)
         self.gaze_line.points = [agent_pos, patch_pos]
 
@@ -494,13 +499,15 @@ class GtMeshWidgetOps:
 
             # Create small spheres at each position
             for p in points:
-                sphere = Sphere(pos=p, r=0.002)
+                sphere = Sphere(pos=p, r=0.002, c=Palette.as_hex("vivid_violet"))
                 self.plotter.at(1).add(sphere)
                 self.agent_path_spheres.append(sphere)
 
             # Create a polyline connecting all points
             if len(points) >= 2:
-                self.agent_path_line = Line(points, c="red", lw=1)
+                self.agent_path_line = Line(
+                    points, c=Palette.as_hex("vivid_violet"), lw=1
+                )
                 self.plotter.at(1).add(self.agent_path_line)
 
         self.plotter.at(1).render()
@@ -540,13 +547,15 @@ class GtMeshWidgetOps:
 
             # Create small black spheres at each patch position
             for p in points:
-                sphere = Sphere(pos=p, r=0.002, c="black")
+                sphere = Sphere(pos=p, r=0.002, c=Palette.as_hex("rich_black"))
                 self.plotter.at(1).add(sphere)
                 self.patch_path_spheres.append(sphere)
 
             # Create a thin black polyline connecting all patch positions
             if len(points) >= 2:
-                self.patch_path_line = Line(points, c="black", lw=1)
+                self.patch_path_line = Line(
+                    points, c=Palette.as_hex("rich_black"), lw=1
+                )
                 self.plotter.at(1).add(self.patch_path_line)
 
         self.plotter.at(1).render()
@@ -614,7 +623,7 @@ class AgentPathButtonWidgetOps:
             "pos": (0.16, 0.98),
             "states": ["Agent Path: On", "Agent Path: Off"],
             "c": ["w", "w"],
-            "bc": ["dg", "dr"],
+            "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
             "size": 30,
             "font": "Calco",
             "bold": True,
@@ -653,7 +662,7 @@ class PatchPathButtonWidgetOps:
             "pos": (0.37, 0.98),
             "states": ["Patch Path: On", "Patch Path: Off"],
             "c": ["w", "w"],
-            "bc": ["dg", "dr"],
+            "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
             "size": 30,
             "font": "Calco",
             "bold": True,
@@ -815,7 +824,7 @@ class HypSpaceWidgetOps:
         evidences, locations, pose_errors, ages, slopes = self._extract_obj_telemetry(
             episode_number, step_number, curr_object
         )
-        pts = Points(np.array(locations), r=6, c="dg")
+        pts = Points(np.array(locations), r=6, c=Palette.as_hex("vivid_violet"))
 
         if hyp_color_button == "Evidence":
             pts.cmap("viridis", evidences, vmin=0.0)
@@ -824,7 +833,9 @@ class HypSpaceWidgetOps:
             mlh = np.zeros_like(evidences, dtype=float)
             pts.cmap("viridis", mlh, vmin=0.0, vmax=1.0)
             mlh_sphere = Sphere(
-                pos=locations[int(np.argmax(evidences))], r=0.002, c="yellow"
+                pos=locations[int(np.argmax(evidences))],
+                r=0.002,
+                c=Palette.as_hex("numenta_blue"),
             )
             self.mlh_sphere = mlh_sphere
             self.plotter.at(2).add(mlh_sphere)
@@ -872,7 +883,7 @@ class ModelButtonWidgetOps:
             "pos": (0.63, 0.98),
             "states": ["Pretrained Model: On", "Pretrained Model: Off"],
             "c": ["w", "w"],
-            "bc": ["dg", "dr"],
+            "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
             "size": 30,
             "font": "Calco",
             "bold": True,
@@ -904,9 +915,9 @@ class HypScopeButtonWidgetOps:
 
         self._add_kwargs = {
             "pos": (0.85, 0.98),
-            "states": ["Hypotheses: Off", "Hypotheses: On"],
+            "states": ["Hypotheses: On", "Hypotheses: Off"],
             "c": ["w", "w"],
-            "bc": ["dr", "dg"],
+            "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
             "size": 30,
             "font": "Calco",
             "bold": True,
@@ -945,7 +956,14 @@ class HypColorButtonWidgetOps:
             "pos": (0.18, 0.15),
             "states": ["None", "Evidence", "MLH", "Pose Error", "Slope", "Ages"],
             "c": ["w", "w", "w", "w", "w", "w"],
-            "bc": ["gray", "dg", "ds", "dm", "db", "dc"],
+            "bc": [
+                Palette.as_hex("link_water"),
+                Palette.as_hex("numenta_blue"),
+                Palette.as_hex("vivid_violet"),
+                Palette.as_hex("bossanova"),
+                Palette.as_hex("charcoal"),
+                Palette.as_hex("amethyst"),
+            ],
             "size": 30,
             "font": "Calco",
             "bold": True,
@@ -1162,9 +1180,20 @@ class LinePlotWidgetOps:
         start_idx = int(valid_idx[0]) if valid_idx.size > 0 else 0
 
         if start_idx < len(slopes):
-            ax_left.plot(x[start_idx:], slopes[start_idx:], label="Max slope")
+            ax_left.plot(
+                x[start_idx:],
+                slopes[start_idx:],
+                color=Palette.as_hex("numenta_blue"),
+                label="Max slope",
+            )
 
-        ax_right.plot(x, hyp_space_sizes, linestyle="--", label="Hypothesis space size")
+        ax_right.plot(
+            x,
+            hyp_space_sizes,
+            linestyle="--",
+            color=Palette.as_hex("numenta_blue"),
+            label="Hypothesis space size",
+        )
 
         ax_left.set_ylim(-1.0, 2.0)
         ax_right.set_ylim(0, 10000)
@@ -1177,7 +1206,7 @@ class LinePlotWidgetOps:
                 add_idx,
                 ymin,
                 ymax,
-                colors="red",
+                colors=Palette.as_hex("vivid_violet"),
                 linestyles="--",
                 alpha=1.0,
                 linewidth=1.0,
