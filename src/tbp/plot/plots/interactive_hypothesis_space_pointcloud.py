@@ -469,7 +469,7 @@ class GtMeshWidgetOps:
         # Clear existing path
         self._clear_agent_path()
 
-        if path_button == "Agent Path":
+        if path_button == "Agent Path: On":
             steps_mask = self.data_parser.extract(
                 self._locators["steps_mask"], episode=str(episode_number)
             )
@@ -525,7 +525,7 @@ class GtMeshWidgetOps:
         # Clear existing path
         self._clear_patch_path()
 
-        if path_button == "Patch Path":
+        if path_button == "Patch Path: On":
             # Collect all patch positions up to the current step
             points: list[np.ndarray] = []
             max_step_idx = max(step_number, 0)
@@ -603,7 +603,7 @@ class AgentPathButtonWidgetOps:
     """WidgetOps implementation for showing/hiding the Agent path.
 
     This widget provides a button to switch between showing and hiding the
-    agent path. The published state here is `Agent Path` or `No Agent Path`
+    agent path. The published state here is `Agent Path: On` or `Agent Path: Off`
     and it is published on the topic `agent_path_button`.
     """
 
@@ -612,7 +612,7 @@ class AgentPathButtonWidgetOps:
 
         self._add_kwargs = {
             "pos": (0.15, 0.98),
-            "states": ["Agent Path", "No Agent Path"],
+            "states": ["Agent Path: On", "Agent Path: Off"],
             "c": ["w", "w"],
             "bc": ["dg", "dr"],
             "size": 30,
@@ -642,7 +642,7 @@ class PatchPathButtonWidgetOps:
     """WidgetOps implementation for showing/hiding the sensor patch path.
 
     This widget provides a button to switch between showing and hiding the
-    patch path. The published state here is `Patch Path` or `No Patch Path`
+    patch path. The published state here is `Patch Path: On` or `Patch Path: Off`
     and it is published on the topic `patch_path_button`.
     """
 
@@ -651,7 +651,7 @@ class PatchPathButtonWidgetOps:
 
         self._add_kwargs = {
             "pos": (0.35, 0.98),
-            "states": ["Patch Path", "No Patch Path"],
+            "states": ["Patch Path: On", "Patch Path: Off"],
             "c": ["w", "w"],
             "bc": ["dg", "dr"],
             "size": 30,
@@ -756,7 +756,7 @@ class HypSpaceWidgetOps:
         step_number = msgs_dict["step_number"]
         model_button = msgs_dict["model_button"]
 
-        if model_button == "Model":
+        if model_button == "Pretrained Model: On":
             locator = self._locators["target"]
             target = self.data_parser.extract(locator, episode=str(episode_number))
             target_id = target["primary_target_object"]
@@ -851,7 +851,7 @@ class HypSpaceWidgetOps:
 
         self._clear_hyp_space()
 
-        if hyp_scope_button != "No Hypotheses":
+        if hyp_scope_button != "Hypotheses: Off":
             hyp_space = self._create_hyp_space(
                 episode_number, step_number, hyp_color_button, hyp_scope_button
             )
@@ -869,8 +869,8 @@ class ModelButtonWidgetOps:
         self.plotter = plotter
 
         self._add_kwargs = {
-            "pos": (0.6, 0.98),
-            "states": ["Model", "No Model"],
+            "pos": (0.62, 0.98),
+            "states": ["Pretrained Model: On", "Pretrained Model: Off"],
             "c": ["w", "w"],
             "bc": ["dg", "dr"],
             "size": 30,
@@ -904,7 +904,7 @@ class HypScopeButtonWidgetOps:
 
         self._add_kwargs = {
             "pos": (0.85, 0.98),
-            "states": ["No Hypotheses", "Hypotheses"],
+            "states": ["Hypotheses: Off", "Hypotheses: On"],
             "c": ["w", "w"],
             "bc": ["dr", "dg"],
             "size": 30,
@@ -982,10 +982,10 @@ class HypColorButtonWidgetOps:
     ) -> tuple[Button, bool]:
         msgs_dict = {msg.name: msg.value for msg in msgs}
 
-        if msgs_dict["hyp_scope_button"] == "No Hypotheses":
+        if msgs_dict["hyp_scope_button"] == "Hypotheses: Off":
             # Hide the button by moving it outside of the scene
             widget.SetPosition(-10.0, -10.0)
-        elif msgs_dict["hyp_scope_button"] == "Hypotheses":
+        elif msgs_dict["hyp_scope_button"] == "Hypotheses: On":
             x, y = self._add_kwargs["pos"]
             widget.SetPosition(x, y)
 
@@ -1379,12 +1379,12 @@ class InteractivePlot:
         for w in self._widgets.values():
             w.add()
         self._widgets["step_slider"].set_state(0)
-        self._widgets["agent_path_button"].set_state("No Agent Path")
-        self._widgets["patch_path_button"].set_state("No Patch Path")
+        self._widgets["agent_path_button"].set_state("Agent Path: Off")
+        self._widgets["patch_path_button"].set_state("Patch Path: Off")
         self._widgets["transparency_slider"].set_state(0.0)
-        self._widgets["model_button"].set_state("Model")
+        self._widgets["model_button"].set_state("Pretrained Model: On")
         self._widgets["hyp_color_button"].set_state("None")
-        self._widgets["hyp_scope_button"].set_state("No Hypotheses")
+        self._widgets["hyp_scope_button"].set_state("Hypotheses: Off")
 
         self.plotter.at(0).show(
             camera=deepcopy(self.cam_dict),
