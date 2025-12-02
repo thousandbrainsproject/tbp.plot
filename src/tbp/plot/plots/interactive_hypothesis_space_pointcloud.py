@@ -1174,7 +1174,7 @@ class LinePlotWidgetOps:
 
         x = np.arange(len(slopes))
 
-        fig, ax_left = plt.subplots(1, 1, figsize=(14, 3))
+        fig, ax_left = plt.subplots(1, 1, figsize=(14, 3), dpi=200)
         ax_right = ax_left.twinx()
 
         valid_idx = np.where(~np.isnan(slopes))[0]
@@ -1266,6 +1266,7 @@ class LinePlotWidgetOps:
         global_step = self.step_mapper.local_to_global(episode_number, step_number)
 
         widget = self._create_burst_figure(global_step)
+        widget.scale(0.5)
         widget.pos(-400, -150, 0)
 
         self.plotter.at(0).add(widget)
