@@ -281,15 +281,15 @@ class GtMeshWidgetOps:
                     TopicSpec("episode_number", required=True),
                     TopicSpec("step_number", required=True),
                 ],
-                callback=self.update_sensor,
+                callback=self.update_agent,
             ),
             WidgetUpdater(
                 topics=[
                     TopicSpec("episode_number", required=True),
                     TopicSpec("step_number", required=True),
-                    TopicSpec("sensor_path_button", required=True),
+                    TopicSpec("agent_path_button", required=True),
                 ],
-                callback=self.update_sensor_path,
+                callback=self.update_agent_path,
             ),
             WidgetUpdater(
                 topics=[
@@ -308,11 +308,11 @@ class GtMeshWidgetOps:
         ]
         self._locators = self.create_locators()
 
-        self.sensor_sphere: Sphere | None = None
+        self.agent_sphere: Sphere | None = None
         self.gaze_line: Line | None = None
 
-        self.sensor_path_spheres: list[Sphere] = []
-        self.sensor_path_line: Line | None = None
+        self.agent_path_spheres: list[Sphere] = []
+        self.agent_path_line: Line | None = None
 
         self.patch_path_spheres: list[Sphere] = []
         self.patch_path_line: Line | None = None
@@ -334,7 +334,7 @@ class GtMeshWidgetOps:
             ]
         )
 
-        locators["sensor_location"] = DataLocator(
+        locators["agent_location"] = DataLocator(
             path=[
                 DataLocatorStep.key(name="episode"),
                 DataLocatorStep.key(name="system", value="motor_system"),
@@ -402,7 +402,7 @@ class GtMeshWidgetOps:
 
         return widget, False
 
-    def update_sensor(
+    def update_agent(
         self, widget: Mesh | None, msgs: list[TopicMessage]
     ) -> tuple[Mesh | None, bool]:
         """Update the agent and sensor patch location on the object.
@@ -424,8 +424,8 @@ class GtMeshWidgetOps:
         )
         mapping = np.flatnonzero(steps_mask)
 
-        sensor_pos = self.data_parser.extract(
-            self._locators["sensor_location"],
+        agent_pos = self.data_parser.extract(
+            self._locators["agent_location"],
             episode=str(episode_number),
             sm_step=int(mapping[step_number]),
         )
@@ -436,40 +436,40 @@ class GtMeshWidgetOps:
             step=step_number,
         )
 
-        if self.sensor_sphere is None:
-            self.sensor_sphere = Sphere(pos=sensor_pos, r=0.004)
-            self.plotter.at(1).add(self.sensor_sphere)
-        self.sensor_sphere.pos(sensor_pos)
+        if self.agent_sphere is None:
+            self.agent_sphere = Sphere(pos=agent_pos, r=0.004)
+            self.plotter.at(1).add(self.agent_sphere)
+        self.agent_sphere.pos(agent_pos)
 
         if self.gaze_line is None:
-            self.gaze_line = Line(sensor_pos, patch_pos, c="black", lw=4)
+            self.gaze_line = Line(agent_pos, patch_pos, c="black", lw=4)
             self.plotter.at(1).add(self.gaze_line)
-        self.gaze_line.points = [sensor_pos, patch_pos]
+        self.gaze_line.points = [agent_pos, patch_pos]
 
         self.plotter.at(1).render()
 
         return widget, False
 
-    def _clear_sensor_path(self) -> None:
-        for s in self.sensor_path_spheres:
+    def _clear_agent_path(self) -> None:
+        for s in self.agent_path_spheres:
             self.plotter.at(1).remove(s)
-        self.sensor_path_spheres.clear()
-        if self.sensor_path_line is not None:
-            self.plotter.at(1).remove(self.sensor_path_line)
-            self.sensor_path_line = None
+        self.agent_path_spheres.clear()
+        if self.agent_path_line is not None:
+            self.plotter.at(1).remove(self.agent_path_line)
+            self.agent_path_line = None
 
-    def update_sensor_path(
+    def update_agent_path(
         self, widget: Mesh | None, msgs: list[TopicMessage]
     ) -> tuple[Mesh | None, bool]:
         msgs_dict = {msg.name: msg.value for msg in msgs}
         episode_number = msgs_dict["episode_number"]
         step_number = msgs_dict["step_number"]
-        path_button = msgs_dict["sensor_path_button"]
+        path_button = msgs_dict["agent_path_button"]
 
         # Clear existing path
-        self._clear_sensor_path()
+        self._clear_agent_path()
 
-        if path_button == "Sensor Path":
+        if path_button == "Agent Path":
             steps_mask = self.data_parser.extract(
                 self._locators["steps_mask"], episode=str(episode_number)
             )
@@ -482,26 +482,26 @@ class GtMeshWidgetOps:
             # Clamp step_number to valid range
             max_step_idx = min(step_number, len(mapping) - 1)
 
-            # Collect all sensor positions up to the current step
+            # Collect all agent positions up to the current step
             points: list[np.ndarray] = []
             for k in range(max_step_idx + 1):
-                sensor_pos = self.data_parser.extract(
-                    self._locators["sensor_location"],
+                agent_pos = self.data_parser.extract(
+                    self._locators["agent_location"],
                     episode=str(episode_number),
                     sm_step=int(mapping[k]),
                 )
-                points.append(sensor_pos)
+                points.append(agent_pos)
 
             # Create small spheres at each position
             for p in points:
                 sphere = Sphere(pos=p, r=0.002)
                 self.plotter.at(1).add(sphere)
-                self.sensor_path_spheres.append(sphere)
+                self.agent_path_spheres.append(sphere)
 
             # Create a polyline connecting all points
             if len(points) >= 2:
-                self.sensor_path_line = Line(points, c="red", lw=1)
-                self.plotter.at(1).add(self.sensor_path_line)
+                self.agent_path_line = Line(points, c="red", lw=1)
+                self.plotter.at(1).add(self.agent_path_line)
 
         self.plotter.at(1).render()
         return widget, False
@@ -599,12 +599,12 @@ class TransparencySliderWidgetOps:
         return [TopicMessage(name="transparency_value", value=state)]
 
 
-class SensorPathButtonWidgetOps:
-    """WidgetOps implementation for showing/hiding the sensor path.
+class AgentPathButtonWidgetOps:
+    """WidgetOps implementation for showing/hiding the Agent path.
 
     This widget provides a button to switch between showing and hiding the
-    sensor path. The published state here is `Sensor Path` or `No Sensor Path`
-    and it is published on the topic `sensor_path_button`.
+    agent path. The published state here is `Agent Path` or `No Agent Path`
+    and it is published on the topic `agent_path_button`.
     """
 
     def __init__(self, plotter: Plotter):
@@ -612,7 +612,7 @@ class SensorPathButtonWidgetOps:
 
         self._add_kwargs = {
             "pos": (0.15, 0.98),
-            "states": ["Sensor Path", "No Sensor Path"],
+            "states": ["Agent Path", "No Agent Path"],
             "c": ["w", "w"],
             "bc": ["dg", "dr"],
             "size": 30,
@@ -633,7 +633,7 @@ class SensorPathButtonWidgetOps:
 
     def state_to_messages(self, state: str) -> Iterable[TopicMessage]:
         messages = [
-            TopicMessage(name="sensor_path_button", value=state),
+            TopicMessage(name="agent_path_button", value=state),
         ]
         return messages
 
@@ -1379,7 +1379,7 @@ class InteractivePlot:
         for w in self._widgets.values():
             w.add()
         self._widgets["step_slider"].set_state(0)
-        self._widgets["sensor_path_button"].set_state("No Sensor Path")
+        self._widgets["agent_path_button"].set_state("No Agent Path")
         self._widgets["patch_path_button"].set_state("No Patch Path")
         self._widgets["transparency_slider"].set_state(0.0)
         self._widgets["model_button"].set_state("Model")
@@ -1442,8 +1442,8 @@ class InteractivePlot:
             dedupe=True,
         )
 
-        widgets["sensor_path_button"] = Widget[Button, str](
-            widget_ops=SensorPathButtonWidgetOps(plotter=self.plotter),
+        widgets["agent_path_button"] = Widget[Button, str](
+            widget_ops=AgentPathButtonWidgetOps(plotter=self.plotter),
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.2,
