@@ -50,6 +50,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+FONT = "Calco"
+
 
 class StepMapper:
     """Bidirectional mapping between global step indices and (episode, local_step).
@@ -626,7 +628,7 @@ class AgentPathButtonWidgetOps:
             "c": ["w", "w"],
             "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
             "size": 30,
-            "font": "Calco",
+            "font": FONT,
             "bold": True,
         }
 
@@ -665,7 +667,7 @@ class PatchPathButtonWidgetOps:
             "c": ["w", "w"],
             "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
             "size": 30,
-            "font": "Calco",
+            "font": FONT,
             "bold": True,
         }
 
@@ -886,7 +888,7 @@ class ModelButtonWidgetOps:
             "c": ["w", "w"],
             "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
             "size": 30,
-            "font": "Calco",
+            "font": FONT,
             "bold": True,
         }
 
@@ -920,7 +922,7 @@ class HypScopeButtonWidgetOps:
             "c": ["w", "w"],
             "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
             "size": 30,
-            "font": "Calco",
+            "font": FONT,
             "bold": True,
         }
 
@@ -966,7 +968,7 @@ class HypColorButtonWidgetOps:
                 Palette.as_hex("amethyst"),
             ],
             "size": 30,
-            "font": "Calco",
+            "font": FONT,
             "bold": True,
         }
 
