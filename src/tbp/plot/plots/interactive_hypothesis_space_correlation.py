@@ -1127,6 +1127,41 @@ class CorrelationPlotWidgetOps:
             return episode, step + 1
         return episode + 1, 0
 
+    def decrement_step(self, episode: int, step: int) -> tuple[int, int]:
+        """Compute the previous `(episode, step)` pair.
+
+        If the current pair is the very beginning `(0, 0)`, return `(0, 0)`.
+
+        Args:
+            episode: Current episode index.
+            step: Current step index.
+
+        Returns:
+            A tuple `(prev_episode, prev_step)`.
+        """
+        # Base case: already at earliest step
+        if episode == 0 and step == 0:
+            return 0, 0
+
+        # If we're not at the start of the episode, just decrement the step
+        if step > 0:
+            return episode, step - 1
+
+        # step == 0 → need to go to previous episode
+        prev_episode = episode - 1
+
+        # Find last step index in previous episode
+        prev_last_step = (
+            len(
+                self.data_parser.query(
+                    self._locators["channel"], episode=str(prev_episode)
+                )
+            )
+            - 1
+        )
+
+        return prev_episode, prev_last_step
+
     def generate_df(self, episode: int, step: int, graph_id: str) -> DataFrame:
         """Build a DataFrame of hypotheses and their stats.
 
@@ -1156,6 +1191,7 @@ class CorrelationPlotWidgetOps:
 
         all_dfs: list[DataFrame] = []
         for input_channel in input_channels:
+            # Current timestep data
             channel_data = self.data_parser.extract(
                 self._locators["channel"],
                 episode=str(episode),
@@ -1170,36 +1206,57 @@ class CorrelationPlotWidgetOps:
                 obj=graph_id,
                 channel=input_channel,
             )
-            inc_episode, inc_step = self.increment_step(episode, step)
-            inc_updater_data = self.data_parser.extract(
+
+            # Previous timestep data
+            dec_episode, dec_step = self.decrement_step(episode, step)
+            dec_channel_data = self.data_parser.extract(
+                self._locators["channel"],
+                episode=str(dec_episode),
+                step=dec_step,
+                obj=graph_id,
+                channel=input_channel,
+            )
+            dec_updater_data = self.data_parser.extract(
                 self._locators["updater"],
-                episode=str(inc_episode),
-                step=inc_step,
+                episode=str(dec_episode),
+                step=dec_step,
                 obj=graph_id,
                 channel=input_channel,
             )
 
             # Removed hypotheses
-            removed_ids = inc_updater_data.get("removed_ids", [])
+            removed_ids = updater_data.get("removed_ids", [])
             if len(removed_ids) > 0:
                 df_removed = DataFrame(
                     {
                         "id": removed_ids,
                         "graph_id": graph_id,
-                        "Evidence": np.array(channel_data["evidence"])[removed_ids],
-                        "Evidence Slope": np.array(updater_data["evidence_slopes"])[
+                        "Evidence": np.array(dec_channel_data["evidence"])[removed_ids],
+                        "Evidence Slope": np.array(dec_updater_data["evidence_slopes"])[
                             removed_ids
                         ],
-                        "Rot_x": np.array(channel_data["rotations"])[removed_ids][:, 0],
-                        "Rot_y": np.array(channel_data["rotations"])[removed_ids][:, 1],
-                        "Rot_z": np.array(channel_data["rotations"])[removed_ids][:, 2],
-                        "Loc_x": np.array(channel_data["locations"])[removed_ids][:, 0],
-                        "Loc_y": np.array(channel_data["locations"])[removed_ids][:, 1],
-                        "Loc_z": np.array(channel_data["locations"])[removed_ids][:, 2],
-                        "Pose Error": np.array(channel_data["pose_errors"])[
+                        "Rot_x": np.array(dec_channel_data["rotations"])[removed_ids][
+                            :, 0
+                        ],
+                        "Rot_y": np.array(dec_channel_data["rotations"])[removed_ids][
+                            :, 1
+                        ],
+                        "Rot_z": np.array(dec_channel_data["rotations"])[removed_ids][
+                            :, 2
+                        ],
+                        "Loc_x": np.array(dec_channel_data["locations"])[removed_ids][
+                            :, 0
+                        ],
+                        "Loc_y": np.array(dec_channel_data["locations"])[removed_ids][
+                            :, 1
+                        ],
+                        "Loc_z": np.array(dec_channel_data["locations"])[removed_ids][
+                            :, 2
+                        ],
+                        "Pose Error": np.array(dec_channel_data["pose_errors"])[
                             removed_ids
                         ],
-                        "age": np.array(updater_data["ages"])[removed_ids],
+                        "age": np.array(dec_updater_data["ages"])[removed_ids],
                         "kind": "Removed",
                         "input_channel": input_channel,
                     }
@@ -1208,7 +1265,6 @@ class CorrelationPlotWidgetOps:
 
             # Added hypotheses
             added_ids = updater_data.get("added_ids", [])
-            added_ids = sorted(set(added_ids) - set(removed_ids))
             if added_ids:
                 df_added = DataFrame(
                     {
@@ -1234,7 +1290,7 @@ class CorrelationPlotWidgetOps:
 
             # Maintained hypotheses
             total_ids = list(range(len(updater_data["evidence_slopes"])))
-            maintained_ids = sorted(set(total_ids) - set(added_ids) - set(removed_ids))
+            maintained_ids = sorted(set(total_ids) - set(added_ids))
             if maintained_ids:
                 df_maintained = DataFrame(
                     {
@@ -1397,15 +1453,15 @@ class CorrelationPlotWidgetOps:
         # Count per kind
         kind_counts = self.df["kind"].value_counts()
 
-        total = len(self.df)
         added = kind_counts.get("Added", 0)
         removed = kind_counts.get("Removed", 0)
+        total = len(self.df) - removed
 
         text = (
             f"Object: {graph_id}\n"
             f"Total Existing Hypotheses: {total}\n"
             f"Added Hypotheses: {added}\n"
-            f"To be removed Hypotheses: {removed}"
+            f"Removed Hypotheses: {removed}"
         )
 
         self.info_widget = Text2D(txt=text, pos="top-left", font=FONT)
@@ -2233,7 +2289,14 @@ class HypothesisLifespanWidgetOps:
         step = int(msgs_dict["step_number"])
         hyp = msgs_dict["selected_hypothesis"]
 
-        df = self._trace_hypothesis(episode, step, hyp["graph_id"], hyp["id"])
+        if hyp["kind"] == "Removed":
+            prev_episode, prev_step = self._decrement_location_pair(episode, step)
+            df = self._trace_hypothesis(
+                prev_episode, prev_step, hyp["graph_id"], hyp["id"]
+            )
+        else:
+            df = self._trace_hypothesis(episode, step, hyp["graph_id"], hyp["id"])
+
         widget = self._add_lifespan_figure(
             df, current_episode=int(episode), current_step=step
         )
