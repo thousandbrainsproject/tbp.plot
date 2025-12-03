@@ -2188,6 +2188,7 @@ class HypothesisLifespanWidgetOps:
 
         self.plotter.at(0).render()
 
+        self.updaters[0].expire_topic("selected_hypothesis")
         return widget, False
 
     def clear_plot(

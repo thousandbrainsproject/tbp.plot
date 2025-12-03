@@ -86,6 +86,17 @@ class WidgetUpdater[WidgetT]:
         """
         return any(spec.name == msg.name for spec in self.topics)
 
+    def expire_topic(self, topic_name: str) -> None:
+        """Expire (remove) the stored message for a given topic.
+
+        After expiration, the updater will require a new message for that topic
+        before becoming ready again.
+
+        Args:
+            topic_name: The topic whose message should be invalidated.
+        """
+        self._inbox.pop(topic_name, None)
+
     def __call__(
         self, widget: WidgetT | None, msg: TopicMessage
     ) -> tuple[WidgetT | None, bool]:
