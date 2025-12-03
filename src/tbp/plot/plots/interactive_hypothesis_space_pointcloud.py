@@ -50,7 +50,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-FONT = "Calco"
+FONT = "Arial"
+FONT_SIZE = 25
 
 
 class StepMapper:
@@ -216,6 +217,7 @@ class StepSliderWidgetOps:
             "value": 0,
             "pos": [(0.11, 0.06), (0.89, 0.06)],
             "title": "Step",
+            "font": FONT,
             "show_value": False,
         }
 
@@ -592,6 +594,7 @@ class TransparencySliderWidgetOps:
             "title": "Mesh Transparency",
             "title_size": 2,
             "slider_width": 0.04,
+            "font": FONT,
             "tube_width": 0.015,
         }
 
@@ -627,9 +630,9 @@ class AgentPathButtonWidgetOps:
             "states": ["Agent Path: On", "Agent Path: Off"],
             "c": ["w", "w"],
             "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
-            "size": 30,
+            "size": FONT_SIZE,
             "font": FONT,
-            "bold": True,
+            "bold": False,
         }
 
     def add(self, callback: Callable) -> Button:
@@ -666,9 +669,9 @@ class PatchPathButtonWidgetOps:
             "states": ["Patch Path: On", "Patch Path: Off"],
             "c": ["w", "w"],
             "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
-            "size": 30,
+            "size": FONT_SIZE,
             "font": FONT,
-            "bold": True,
+            "bold": False,
         }
 
     def add(self, callback: Callable) -> Button:
@@ -814,6 +817,13 @@ class HypSpaceWidgetOps:
 
         return evidences, locations, pose_errors, ages, slopes
 
+    def _change_scalarbar_font(self, sb):
+        sb_text = sb.GetLabelTextProperty()
+        sb_text.SetFontFamilyAsString(FONT)
+        sb_text.SetColor((0.2, 0.2, 0.2))
+        sb_text.SetBold(0)
+        sb_text.SetItalic(0)
+
     def _create_hyp_space(
         self,
         episode_number: int,
@@ -831,7 +841,8 @@ class HypSpaceWidgetOps:
 
         if hyp_color_button == "Evidence":
             pts.cmap("viridis", evidences, vmin=0.0)
-            pts.add_scalarbar(title="Evidence")
+            pts.add_scalarbar(title="", pos=[[0.8, 0.3], [0.9, 0.9]])
+            self._change_scalarbar_font(pts.scalarbar)
         if hyp_color_button == "MLH":
             mlh = np.zeros_like(evidences, dtype=float)
             pts.cmap("viridis", mlh, vmin=0.0, vmax=1.0)
@@ -844,13 +855,16 @@ class HypSpaceWidgetOps:
             self.plotter.at(2).add(mlh_sphere)
         elif hyp_color_button == "Slope":
             pts.cmap("viridis", slopes, vmin=0.0)
-            pts.add_scalarbar(title="Slope")
+            pts.add_scalarbar(title="", pos=[[0.8, 0.3], [0.9, 0.9]])
+            self._change_scalarbar_font(pts.scalarbar)
         elif hyp_color_button == "Ages":
             pts.cmap("viridis", ages, vmin=0.0)
-            pts.add_scalarbar(title="Age")
+            pts.add_scalarbar(title="", pos=[[0.8, 0.3], [0.9, 0.9]])
+            self._change_scalarbar_font(pts.scalarbar)
         elif hyp_color_button == "Pose Error":
             pts.cmap("viridis", pose_errors, vmin=0.0)
-            pts.add_scalarbar(title="Pose Error")
+            pts.add_scalarbar(title="", pos=[[0.8, 0.3], [0.9, 0.9]])
+            self._change_scalarbar_font(pts.scalarbar)
 
         return pts
 
@@ -887,9 +901,9 @@ class ModelButtonWidgetOps:
             "states": ["Pretrained Model: On", "Pretrained Model: Off"],
             "c": ["w", "w"],
             "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
-            "size": 30,
+            "size": FONT_SIZE,
             "font": FONT,
-            "bold": True,
+            "bold": False,
         }
 
     def add(self, callback: Callable) -> Button:
@@ -921,9 +935,9 @@ class HypScopeButtonWidgetOps:
             "states": ["Hypotheses: On", "Hypotheses: Off"],
             "c": ["w", "w"],
             "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
-            "size": 30,
+            "size": FONT_SIZE,
             "font": FONT,
-            "bold": True,
+            "bold": False,
         }
 
     def add(self, callback: Callable) -> Button:
@@ -956,7 +970,7 @@ class HypColorButtonWidgetOps:
         self.plotter = plotter
 
         self._add_kwargs = {
-            "pos": (0.18, 0.15),
+            "pos": (0.88, 0.2),
             "states": ["None", "Evidence", "MLH", "Pose Error", "Slope", "Ages"],
             "c": ["w", "w", "w", "w", "w", "w"],
             "bc": [
@@ -967,9 +981,9 @@ class HypColorButtonWidgetOps:
                 Palette.as_hex("charcoal"),
                 Palette.as_hex("amethyst"),
             ],
-            "size": 30,
+            "size": FONT_SIZE - 5,
             "font": FONT,
-            "bold": True,
+            "bold": False,
         }
 
         self.updaters = [
