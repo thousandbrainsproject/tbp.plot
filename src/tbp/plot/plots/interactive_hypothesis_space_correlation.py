@@ -1272,6 +1272,27 @@ class CorrelationPlotWidgetOps:
                 )
                 all_dfs.append(df_maintained)
 
+        if not all_dfs:
+            # No hypotheses for any input_channel at this (episode, step, graph_id)
+            return DataFrame(
+                columns=[
+                    "id",
+                    "graph_id",
+                    "Evidence",
+                    "Evidence Slope",
+                    "Rot_x",
+                    "Rot_y",
+                    "Rot_z",
+                    "Loc_x",
+                    "Loc_y",
+                    "Loc_z",
+                    "Pose Error",
+                    "age",
+                    "kind",
+                    "input_channel",
+                ]
+            )
+
         return pd.concat(all_dfs, ignore_index=True)
 
     def add_correlation_figure(self, x="Evidence Slope", y="Pose Error") -> Image:
@@ -1286,44 +1307,47 @@ class CorrelationPlotWidgetOps:
         """
         g = sns.JointGrid(data=self.df, x=x, y=y, height=6)
 
-        sns.scatterplot(
-            data=self.df,
-            x=x,
-            y=y,
-            hue="kind",
-            ax=g.ax_joint,
-            s=8,
-            alpha=0.8,
-            palette=HUE_PALETTE,
-        )
+        if not self.df.empty:
+            sns.scatterplot(
+                data=self.df,
+                x=x,
+                y=y,
+                hue="kind",
+                ax=g.ax_joint,
+                s=8,
+                alpha=0.8,
+                palette=HUE_PALETTE,
+            )
 
-        sns.kdeplot(
-            data=self.df,
-            x=x,
-            hue="kind",
-            ax=g.ax_marg_x,
-            fill=True,
-            alpha=0.2,
-            common_norm=False,
-            palette=HUE_PALETTE,
-            legend=False,
-        )
+            sns.kdeplot(
+                data=self.df,
+                x=x,
+                hue="kind",
+                ax=g.ax_marg_x,
+                fill=True,
+                alpha=0.2,
+                common_norm=False,
+                palette=HUE_PALETTE,
+                legend=False,
+                warn_singular=False,
+            )
 
-        sns.kdeplot(
-            data=self.df,
-            y=y,
-            hue="kind",
-            ax=g.ax_marg_y,
-            fill=True,
-            alpha=0.2,
-            common_norm=False,
-            palette=HUE_PALETTE,
-            legend=False,
-        )
+            sns.kdeplot(
+                data=self.df,
+                y=y,
+                hue="kind",
+                ax=g.ax_marg_y,
+                fill=True,
+                alpha=0.2,
+                common_norm=False,
+                palette=HUE_PALETTE,
+                legend=False,
+                warn_singular=False,
+            )
 
-        legend = g.ax_joint.get_legend()
-        if legend:
-            legend.set_title(None)
+            legend = g.ax_joint.get_legend()
+            if legend:
+                legend.set_title(None)
 
         g.ax_joint.set_xlim(-2.0, 2.0)
         g.ax_joint.set_ylim(0, 3.25)
@@ -1392,12 +1416,13 @@ class CorrelationPlotWidgetOps:
         if self.mlh_circle is not None:
             self.plotter.at(0).remove(self.mlh_circle)
 
-        if self.df.empty:
+        df_valid = self.df[self.df["kind"] != "Removed"]
+
+        if df_valid.empty:
             return
 
-        (slope, error) = tuple(
-            self.df.loc[self.df["Evidence"].idxmax(), ["Evidence Slope", "Pose Error"]]
-        )
+        idx = df_valid["Evidence"].idxmax()
+        (slope, error) = tuple(df_valid.loc[idx, ["Evidence Slope", "Pose Error"]])
 
         if pd.isna(slope):
             return
@@ -2136,6 +2161,8 @@ class HypothesisLifespanWidgetOps:
 
         # Setting ticks on x-axis
         x_min, x_max = df["x"].min(), df["x"].max()
+        x_min = min(x_min, x_current)
+        x_max = max(x_max, x_current)
         ax1.set_xlim(x_min - 0.5, x_max + 0.5)
         major_locs_all = [
             (ep, episode_offsets[ep]) for ep in range(start_episode, end_episode + 1)
