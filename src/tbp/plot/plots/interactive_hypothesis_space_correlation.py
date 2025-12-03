@@ -23,6 +23,7 @@ from pandas import DataFrame, Series
 from pubsub.core import Publisher
 from vedo import Button, Circle, Image, Line, Mesh, Plotter, Slider2D, Sphere, Text2D
 
+from tbp.interactive.colors import Palette
 from tbp.interactive.data import (
     DataLocator,
     DataLocatorStep,
@@ -51,12 +52,16 @@ logger = logging.getLogger(__name__)
 
 
 HUE_PALETTE = {
-    "Added": "#66c2a5",
-    "Removed": "#fc8d62",
-    "Maintained": "#8da0cb",
-    "Evidence": "#1f77b4",
-    "Slope": "#ff7f0e",
+    "Maintained": Palette.as_hex("numenta_blue"),
+    "Removed": Palette.as_hex("vivid_violet"),
+    "Added": Palette.as_hex("charcoal"),
+    "Primary": Palette.as_hex("numenta_blue"),
+    "Secondary": Palette.as_hex("vivid_violet"),
+    "Accent": Palette.as_hex("charcoal"),
 }
+
+FONT = "Arial"
+FONT_SIZE = 30
 
 
 class EpisodeSliderWidgetOps:
@@ -84,6 +89,7 @@ class EpisodeSliderWidgetOps:
             "xmax": 10,
             "value": 0,
             "pos": [(0.1, 0.2), (0.7, 0.2)],
+            "font": FONT,
             "title": "Episode",
         }
 
@@ -198,6 +204,7 @@ class StepSliderWidgetOps:
             "xmax": 10,
             "value": 0,
             "pos": [(0.1, 0.1), (0.7, 0.1)],
+            "font": FONT,
             "title": "Step",
         }
         self._locators = self.create_locators()
@@ -352,7 +359,7 @@ class GtMeshWidgetOps:
         self.gaze_line: Line | None = None
         self.sensor_sphere: Sphere | None = None
 
-        self.plotter.at(1).add(Text2D(txt="Ground Truth", pos="top-center"))
+        self.plotter.at(1).add(Text2D(txt="Ground Truth", pos="top-center", font=FONT))
 
     def create_locators(self) -> dict[str, DataLocator]:
         """Create and return data locators used by this widget.
@@ -502,11 +509,11 @@ class PrimaryButtonWidgetOps:
         self._add_kwargs = {
             "pos": (0.85, 0.2),
             "states": ["Primary Target"],
-            "c": "w",
-            "bc": "dg",
-            "size": 30,
-            "font": "Calco",
-            "bold": True,
+            "c": ["w"],
+            "bc": [HUE_PALETTE["Primary"]],
+            "size": FONT_SIZE,
+            "font": FONT,
+            "bold": False,
         }
 
     def add(self, callback: Callable) -> Button:
@@ -555,10 +562,10 @@ class PrevButtonWidgetOps:
             "pos": (0.83, 0.13),
             "states": ["<"],
             "c": ["w"],
-            "bc": ["dg"],
-            "size": 30,
-            "font": "Calco",
-            "bold": True,
+            "bc": [HUE_PALETTE["Primary"]],
+            "size": FONT_SIZE,
+            "font": FONT,
+            "bold": False,
         }
 
     def add(self, callback: Callable) -> Button:
@@ -607,10 +614,10 @@ class NextButtonWidgetOps:
             "pos": (0.88, 0.13),
             "states": [">"],
             "c": ["w"],
-            "bc": ["dg"],
-            "size": 30,
-            "font": "Calco",
-            "bold": True,
+            "bc": [HUE_PALETTE["Primary"]],
+            "size": FONT_SIZE,
+            "font": FONT,
+            "bold": False,
         }
 
     def add(self, callback: Callable) -> Button:
@@ -657,6 +664,7 @@ class AgeThresholdWidgetOps:
             "xmax": 10,
             "value": 0,
             "pos": [(0.05, 0.01), (0.05, 0.3)],
+            "font": FONT,
             "title": "Age",
         }
 
@@ -1376,7 +1384,7 @@ class CorrelationPlotWidgetOps:
             f"To be removed Hypotheses: {removed}"
         )
 
-        self.info_widget = Text2D(txt=text, pos="top-left")
+        self.info_widget = Text2D(txt=text, pos="top-left", font=FONT)
         self.plotter.at(0).add(self.info_widget)
 
     def add_mlh_circle(self):
@@ -1541,7 +1549,9 @@ class HypothesisMeshWidgetOps:
         self.default_object_position = (0, 1.5, 0)
         self.sensor_sphere: Sphere | None = None
 
-        self.plotter.at(2).add(Text2D(txt="Selected Hypothesis", pos="top-center"))
+        self.plotter.at(2).add(
+            Text2D(txt="Selected Hypothesis", pos="top-center", font=FONT)
+        )
 
     def clear_mesh(
         self, widget: Mesh | None, msgs: list[TopicMessage]
@@ -1735,12 +1745,29 @@ class HypSpaceSizeWidgetOps:
 
         fig, ax = plt.subplots(figsize=(6, 3))
         sns.lineplot(
-            ax=ax, data=merged, x="step", y="idx_current", label=str(current_object)
+            ax=ax,
+            data=merged,
+            x="step",
+            y="idx_current",
+            label=str(current_object),
+            color=HUE_PALETTE["Primary"],
         )
         sns.lineplot(
-            ax=ax, data=merged, x="step", y="idx_others", label="Other objects"
+            ax=ax,
+            data=merged,
+            x="step",
+            y="idx_others",
+            label="other objects",
+            color=HUE_PALETTE["Secondary"],
         )
-        sns.lineplot(ax=ax, data=merged, x="step", y="idx_total", label="Total")
+        sns.lineplot(
+            ax=ax,
+            data=merged,
+            x="step",
+            y="idx_total",
+            label="total",
+            color=HUE_PALETTE["Accent"],
+        )
 
         ax.set_xlabel("Step")
         ax.set_ylabel("% change from step 0")
@@ -2086,7 +2113,7 @@ class HypothesisLifespanWidgetOps:
             marker="o",
             markersize=4,
             linewidth=1.2,
-            color=HUE_PALETTE["Evidence"],
+            color=HUE_PALETTE["Primary"],
             label="Evidence",
         )
         ax1.set_xlabel("Episode / Step")
@@ -2102,7 +2129,7 @@ class HypothesisLifespanWidgetOps:
             marker="o",
             markersize=4,
             linewidth=1.2,
-            color=HUE_PALETTE["Slope"],
+            color=HUE_PALETTE["Secondary"],
             label="Evidence Slope",
         )
         ax2.set_ylabel("Evidence Slope")
@@ -2157,7 +2184,7 @@ class HypothesisLifespanWidgetOps:
             + f"Evidence Slope: {hyp['Evidence Slope']:.2f}\n"
             + f"Pose Error: {hyp['Pose Error']:.2f}"
         )
-        self.info_widget = Text2D(txt=info, pos="top-right")
+        self.info_widget = Text2D(txt=info, pos="top-right", font=FONT)
         self.plotter.at(0).add(self.info_widget)
 
     def update_plot(
