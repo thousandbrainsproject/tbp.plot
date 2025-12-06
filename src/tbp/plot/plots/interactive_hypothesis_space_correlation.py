@@ -1417,6 +1417,7 @@ class CorrelationPlotWidgetOps:
             The Image widget for the correlation plot.
         """
         g = sns.JointGrid(data=self.df, x=x, y=y, height=6)
+        g.figure.set_dpi(400)
 
         if not self.df.empty:
             sns.scatterplot(
@@ -1467,6 +1468,7 @@ class CorrelationPlotWidgetOps:
         g.figure.tight_layout()
 
         widget = Image(g.figure)
+        widget.scale(0.25)
         plt.close(g.figure)
         self.plotter.at(0).add(widget)
         return widget
