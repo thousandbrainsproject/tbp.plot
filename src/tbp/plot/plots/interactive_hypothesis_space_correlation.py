@@ -343,7 +343,10 @@ class GtMeshWidgetOps:
         self.ycb_loader = ycb_loader
         self.updaters = [
             WidgetUpdater(
-                topics=[TopicSpec("episode_number", required=True)],
+                topics=[
+                    TopicSpec("episode_number", required=True),
+                    TopicSpec("transparency_value", required=True),
+                ],
                 callback=self.update_mesh,
             ),
             WidgetUpdater(
@@ -352,6 +355,12 @@ class GtMeshWidgetOps:
                     TopicSpec("step_number", required=True),
                 ],
                 callback=self.update_sensor,
+            ),
+            WidgetUpdater(
+                topics=[
+                    TopicSpec("transparency_value", required=True),
+                ],
+                callback=self.update_transparency,
             ),
         ]
         self._locators = self.create_locators()
@@ -447,6 +456,7 @@ class GtMeshWidgetOps:
         widget.rotate_y(target_rot[1])
         widget.rotate_z(target_rot[2])
         widget.shift(*target_pos)
+        widget.alpha(1.0 - msgs_dict["transparency_value"])
 
         self.plotter.at(1).add(widget)
         self.plotter.at(1).render()
@@ -491,6 +501,15 @@ class GtMeshWidgetOps:
 
         return widget, False
 
+    def update_transparency(
+        self, widget: None, msgs: list[TopicMessage]
+    ) -> tuple[None, bool]:
+        msgs_dict = {msg.name: msg.value for msg in msgs}
+        if widget is not None:
+            widget.alpha(1.0 - msgs_dict["transparency_value"])
+            self.plotter.at(1).render()
+        return widget, False
+
 
 class PrimaryButtonWidgetOps:
     """WidgetOps implementation for a primary-target button.
@@ -507,7 +526,7 @@ class PrimaryButtonWidgetOps:
         self.plotter = plotter
 
         self._add_kwargs = {
-            "pos": (0.85, 0.2),
+            "pos": (0.9, 0.2),
             "states": ["Primary Target"],
             "c": ["w"],
             "bc": [HUE_PALETTE["Primary"]],
@@ -559,7 +578,7 @@ class PrevButtonWidgetOps:
         self.plotter = plotter
 
         self._add_kwargs = {
-            "pos": (0.83, 0.13),
+            "pos": (0.88, 0.13),
             "states": ["<"],
             "c": ["w"],
             "bc": [HUE_PALETTE["Primary"]],
@@ -611,7 +630,7 @@ class NextButtonWidgetOps:
         self.plotter = plotter
 
         self._add_kwargs = {
-            "pos": (0.88, 0.13),
+            "pos": (0.93, 0.13),
             "states": [">"],
             "c": ["w"],
             "bc": [HUE_PALETTE["Primary"]],
@@ -711,6 +730,42 @@ class AgeThresholdWidgetOps:
             A list with a single `TopicMessage` named `"age_threshold"`.
         """
         return [TopicMessage(name="age_threshold", value=state)]
+
+
+class TransparencySliderWidgetOps:
+    """WidgetOps implementation for the transparency slider.
+
+    This widget provides a slider to control the transparency of the mesh
+    object. It publishes on the topic `transparency_value` a float value between 0.0
+    and 1.0.
+    """
+
+    def __init__(self, plotter: Plotter) -> None:
+        self.plotter = plotter
+
+        self._add_kwargs = {
+            "xmin": 0.0,
+            "xmax": 1.0,
+            "value": 0.0,
+            "pos": [(0.77, 0.01), (0.77, 0.3)],
+            "title": "Mesh Transparency",
+            "font": FONT,
+        }
+
+    def add(self, callback: Callable) -> Slider2D:
+        widget = self.plotter.at(0).add_slider(callback, **self._add_kwargs)
+        # widget.GetRepresentation().SetLabelHeight(0.05)
+        self.plotter.at(0).render()
+        return widget
+
+    def extract_state(self, widget: Slider2D) -> float:
+        return extract_slider_state(widget, round_value=False)
+
+    def set_state(self, widget: Slider2D, value: float) -> None:
+        set_slider_state(widget, value)
+
+    def state_to_messages(self, state: float) -> Iterable[TopicMessage]:
+        return [TopicMessage(name="transparency_value", value=state)]
 
 
 class CurrentObjectWidgetOps:
@@ -1623,7 +1678,10 @@ class HypothesisMeshWidgetOps:
                 callback=self.clear_mesh,
             ),
             WidgetUpdater(
-                topics=[TopicSpec("selected_hypothesis", required=True)],
+                topics=[
+                    TopicSpec("selected_hypothesis", required=True),
+                    TopicSpec("transparency_value", required=True),
+                ],
                 callback=self.update_mesh,
             ),
         ]
@@ -1684,6 +1742,7 @@ class HypothesisMeshWidgetOps:
         widget.rotate_y(hypothesis["Rot_y"])
         widget.rotate_z(hypothesis["Rot_z"])
         widget.shift(self.default_object_position)
+        widget.alpha(1.0 - msgs_dict["transparency_value"])
         self.plotter.at(2).add(widget)
 
         # Add sphere for sensor's hypothesized location
@@ -2387,6 +2446,7 @@ class InteractivePlot:
             w.add()
         self._widgets["episode_slider"].set_state(0)
         self._widgets["age_threshold"].set_state(0)
+        self._widgets["transparency_slider"].set_state(0.0)
 
         self.plotter.at(0).show(
             camera=deepcopy(self.cam_dict),
@@ -2473,6 +2533,16 @@ class InteractivePlot:
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.5,
+            dedupe=True,
+        )
+
+        widgets["transparency_slider"] = Widget[Slider2D, float](
+            widget_ops=TransparencySliderWidgetOps(
+                plotter=self.plotter,
+            ),
+            bus=self.event_bus,
+            scheduler=self.scheduler,
+            debounce_sec=0.1,
             dedupe=True,
         )
 
