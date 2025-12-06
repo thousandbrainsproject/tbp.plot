@@ -31,6 +31,7 @@ from tbp.interactive.data import (
     DataParser,
     YCBMeshLoader,
 )
+from tbp.interactive.scopes import ScopeViewer
 from tbp.interactive.topics import TopicMessage, TopicSpec
 from tbp.interactive.utils import (
     Bounds,
@@ -316,7 +317,6 @@ class StepSliderWidgetOps:
 
         # set slider value back to zero
         self.set_state(widget, 0)
-        self.plotter.at(0).render()
 
         return widget, True
 
@@ -369,8 +369,11 @@ class GtMeshWidgetOps:
 
         self.gaze_line: Line | None = None
         self.sensor_sphere: Sphere | None = None
+        self.text_label: Text2D = Text2D(
+            txt="Ground Truth", pos="top-center", font=FONT
+        )
 
-        self.plotter.at(1).add(Text2D(txt="Ground Truth", pos="top-center", font=FONT))
+        self.plotter.at(1).add(self.text_label)
 
     def create_locators(self) -> dict[str, DataLocator]:
         """Create and return data locators used by this widget.
@@ -461,7 +464,6 @@ class GtMeshWidgetOps:
         widget.alpha(1.0 - msgs_dict["transparency_value"])
 
         self.plotter.at(1).add(widget)
-        self.plotter.at(1).render()
 
         return widget, False
 
@@ -499,8 +501,6 @@ class GtMeshWidgetOps:
             self.plotter.at(1).add(self.gaze_line)
         self.gaze_line.points = [sensor_pos, patch_pos]
 
-        self.plotter.at(1).render()
-
         return widget, False
 
     def update_transparency(
@@ -509,7 +509,6 @@ class GtMeshWidgetOps:
         msgs_dict = {msg.name: msg.value for msg in msgs}
         if widget is not None:
             widget.alpha(1.0 - msgs_dict["transparency_value"])
-            self.plotter.at(1).render()
         return widget, False
 
 
@@ -1052,7 +1051,6 @@ class ClickWidgetOps:
                 cam.SetFocalPoint(self.cam_dict["focal_point"])
                 cam.SetViewUp((0, 1, 0))
                 cam.SetClippingRange((0.01, 1000.01))
-                self.plotter.at(0).render()
         elif event.at == 1:
             cam_clicked = self.plotter.renderers[1].GetActiveCamera()
             cam_copy = self.plotter.renderers[2].GetActiveCamera()
@@ -1604,7 +1602,6 @@ class CorrelationPlotWidgetOps:
         # Add mlh circle to scene
         self.add_mlh_circle()
 
-        self.plotter.at(0).render()
         return widget, True
 
     def update_selection(
@@ -1653,7 +1650,6 @@ class CorrelationPlotWidgetOps:
         # Add the selected hypothesis marker
         self.add_highlight_circle(gui_location)
 
-        self.plotter.at(0).render()
         return widget, True
 
 
@@ -1691,10 +1687,11 @@ class HypothesisMeshWidgetOps:
         ]
         self.default_object_position = (0, 1.5, 0)
         self.sensor_sphere: Sphere | None = None
-
-        self.plotter.at(2).add(
-            Text2D(txt="Selected Hypothesis", pos="top-center", font=FONT)
+        self.text_label: Text2D = Text2D(
+            txt="Selected Hypothesis", pos="top-center", font=FONT
         )
+
+        self.plotter.at(2).add(self.text_label)
 
     def clear_mesh(
         self, widget: Mesh | None, msgs: list[TopicMessage]
@@ -1715,7 +1712,6 @@ class HypothesisMeshWidgetOps:
             self.plotter.at(2).remove(self.sensor_sphere)
             self.sensor_sphere = None
 
-        self.plotter.at(2).render()
         return widget, False
 
     def update_mesh(
@@ -1755,7 +1751,6 @@ class HypothesisMeshWidgetOps:
         self.sensor_sphere.pos(sensor_pos)
         self.plotter.at(2).add(self.sensor_sphere)
 
-        self.plotter.at(2).render()
         return widget, False
 
 
@@ -1947,7 +1942,6 @@ class HypSpaceSizeWidgetOps:
         widget = self.add_hyp_space_size_figure(
             hyp_size_df, msgs_dict["current_object"]
         )
-        self.plotter.at(0).render()
         return widget, False
 
 
@@ -2366,8 +2360,6 @@ class HypothesisLifespanWidgetOps:
 
         self._add_info_text(hyp)
 
-        self.plotter.at(0).render()
-
         self.updaters[0].expire_topic("selected_hypothesis")
         return widget, False
 
@@ -2389,8 +2381,6 @@ class HypothesisLifespanWidgetOps:
         if self.info_widget is not None:
             self.plotter.at(0).remove(self.info_widget)
             self.info_widget = None
-
-        self.plotter.at(0).render()
 
         return None, False
 
@@ -2452,6 +2442,7 @@ class InteractivePlot:
         self._widgets["age_threshold"].set_state(0)
         self._widgets["transparency_slider"].set_state(0.0)
 
+        self.scope_viewer = ScopeViewer(self.plotter, self._widgets)
         self.plotter.add_callback("KeyPress", self._on_keypress_quit)
 
         self.plotter.at(0).show(
@@ -2481,6 +2472,7 @@ class InteractivePlot:
                 plotter=self.plotter,
                 data_parser=self.data_parser,
             ),
+            scopes=[1, 2, 3],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.5,
@@ -2492,6 +2484,7 @@ class InteractivePlot:
                 plotter=self.plotter,
                 data_parser=self.data_parser,
             ),
+            scopes=[1, 2, 3],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.5,
@@ -2504,6 +2497,7 @@ class InteractivePlot:
                 data_parser=self.data_parser,
                 ycb_loader=self.ycb_loader,
             ),
+            scopes=[1],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.5,
@@ -2512,6 +2506,7 @@ class InteractivePlot:
 
         widgets["primary_button"] = Widget[Button, str](
             widget_ops=PrimaryButtonWidgetOps(plotter=self.plotter),
+            scopes=[2, 3],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.2,
@@ -2520,6 +2515,7 @@ class InteractivePlot:
 
         widgets["prev_button"] = Widget[Button, str](
             widget_ops=PrevButtonWidgetOps(plotter=self.plotter),
+            scopes=[2, 3],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.2,
@@ -2528,6 +2524,7 @@ class InteractivePlot:
 
         widgets["next_button"] = Widget[Button, str](
             widget_ops=NextButtonWidgetOps(plotter=self.plotter),
+            scopes=[2, 3],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.2,
@@ -2536,6 +2533,7 @@ class InteractivePlot:
 
         widgets["age_threshold"] = Widget[Slider2D, int](
             widget_ops=AgeThresholdWidgetOps(plotter=self.plotter),
+            scopes=[2],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.5,
@@ -2546,6 +2544,7 @@ class InteractivePlot:
             widget_ops=TransparencySliderWidgetOps(
                 plotter=self.plotter,
             ),
+            scopes=[1, 3],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.1,
@@ -2554,6 +2553,7 @@ class InteractivePlot:
 
         widgets["current_object"] = Widget[None, str](
             widget_ops=CurrentObjectWidgetOps(data_parser=self.data_parser),
+            scopes=[2, 3],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.2,
@@ -2564,6 +2564,7 @@ class InteractivePlot:
             widget_ops=ClickWidgetOps(
                 plotter=self.plotter, cam_dict=deepcopy(self.cam_dict)
             ),
+            scopes=[1, 2, 3],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.1,
@@ -2574,6 +2575,7 @@ class InteractivePlot:
             widget_ops=CorrelationPlotWidgetOps(
                 plotter=self.plotter, data_parser=self.data_parser
             ),
+            scopes=[2],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.3,
@@ -2585,6 +2587,7 @@ class InteractivePlot:
                 plotter=self.plotter,
                 ycb_loader=self.ycb_loader,
             ),
+            scopes=[3],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.0,
@@ -2596,6 +2599,7 @@ class InteractivePlot:
                 plotter=self.plotter,
                 data_parser=self.data_parser,
             ),
+            scopes=[2],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.0,
@@ -2607,6 +2611,7 @@ class InteractivePlot:
                 plotter=self.plotter,
                 data_parser=self.data_parser,
             ),
+            scopes=[3],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.0,
