@@ -19,6 +19,7 @@ import matplotlib.ticker as mticker
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import vedo
 from pandas import DataFrame, Series
 from pubsub.core import Publisher
 from vedo import Button, Circle, Image, Line, Mesh, Plotter, Slider2D, Sphere, Text2D
@@ -50,6 +51,7 @@ from tbp.plot.registry import attach_args, register
 
 logger = logging.getLogger(__name__)
 
+vedo.settings.enable_default_keyboard_callbacks = False
 
 HUE_PALETTE = {
     "Maintained": Palette.as_hex("numenta_blue"),
@@ -2450,6 +2452,8 @@ class InteractivePlot:
         self._widgets["age_threshold"].set_state(0)
         self._widgets["transparency_slider"].set_state(0.0)
 
+        self.plotter.add_callback("KeyPress", self._on_keypress_quit)
+
         self.plotter.at(0).show(
             camera=deepcopy(self.cam_dict),
             interactive=False,  # Must be set to False if not the last `show` call
@@ -2610,6 +2614,11 @@ class InteractivePlot:
         )
 
         return widgets
+
+    def _on_keypress_quit(self, event):
+        key = getattr(event, "keypress", None)
+        if key is not None and key.lower() == "q":
+            self.plotter.interactor.ExitCallback()
 
 
 @register(
