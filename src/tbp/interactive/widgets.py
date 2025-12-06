@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from pubsub.core import Publisher
-from vedo import Button, Slider2D
+from vedo import Button, Plotter, Slider2D
 
 from tbp.interactive.topics import TopicMessage
 from tbp.interactive.utils import VtkDebounceScheduler
@@ -126,6 +126,7 @@ class Widget[WidgetT, StateT]:
         widget_ops: Composed functionality for get/set/add/remove operations.
         debounce_sec: Debounce delay in seconds for change publications.
         dedupe: If True, skip publishing unchanged values.
+        scopes: List of integer scopes this widget belongs to.
 
     Runtime Attributes:
         widget: The created widget instance.
@@ -145,11 +146,13 @@ class Widget[WidgetT, StateT]:
             | HasUpdaters[WidgetT]
             | WidgetOpsProto
         ),
+        scopes: list[int] | None,
         bus: Publisher,
         scheduler: VtkDebounceScheduler,
         debounce_sec: float = 0.25,
         dedupe: bool = True,
     ):
+        self.scopes = scopes or []
         self.bus = bus
         self.scheduler = scheduler
         self.debounce_sec = debounce_sec
@@ -160,10 +163,15 @@ class Widget[WidgetT, StateT]:
         self.state: StateT | None = None
         self.last_published_state: StateT | None = None
         self._sched_key = object()  # hashable unique key
+        self._visible: bool = True
 
         if isinstance(self.widget_ops, HasUpdaters):
             for topic in self.updater_topics:
                 self.bus.subscribe(self._on_update_topic, topic)
+
+    @property
+    def is_visible(self) -> bool:
+        return self._visible
 
     @property
     def updater_topics(self) -> set[str]:
@@ -249,6 +257,12 @@ class Widget[WidgetT, StateT]:
                 self.state = self.extract_state()
                 self.scheduler.schedule_once(self._sched_key, self.debounce_sec)
 
+        if hasattr(self.widget_ops, "plotter") and isinstance(
+            self.widget_ops.plotter, Plotter
+        ):
+            self._set_visibility(self.is_visible)
+            self.widget_ops.plotter.render()
+
     def _on_debounce_fire(self) -> None:
         """Handler fired by the scheduler to publish debounced state."""
         self._publish(self.extract_state())
@@ -267,3 +281,33 @@ class Widget[WidgetT, StateT]:
                 self.bus.sendMessage(msg.name, msg=msg)
 
             self.last_published_state = state
+
+    def on(self) -> None:
+        """Make this widget visually 'on'."""
+        self._set_visibility(True)
+
+    def off(self) -> None:
+        """Make this widget visually 'off'."""
+        self._set_visibility(False)
+
+    def _supports_toggle(self, obj: object) -> bool:
+        return hasattr(obj, "on") and hasattr(obj, "off")
+
+    def _set_visibility(self, visible: bool) -> None:
+        self._visible = visible
+
+        if self.widget is not None and self._supports_toggle(self.widget):
+            if visible:
+                self.widget.on()
+            else:
+                self.widget.off()
+
+        # Iterate over widget_ops attributes to find vedo-style objects
+        # that also support .on() / .off(). This lets you attach extra
+        # meshes, paths, spheres, etc., and have them follow scope visibility.
+        for attr in vars(self.widget_ops).values():
+            if self._supports_toggle(attr):
+                if visible:
+                    attr.on()
+                else:
+                    attr.off()
