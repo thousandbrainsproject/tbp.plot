@@ -356,7 +356,7 @@ class GtMeshWidgetOps:
                     TopicSpec("episode_number", required=True),
                     TopicSpec("step_number", required=True),
                 ],
-                callback=self.update_sensor,
+                callback=self.update_agent,
             ),
             WidgetUpdater(
                 topics=[
@@ -368,7 +368,7 @@ class GtMeshWidgetOps:
         self._locators = self.create_locators()
 
         self.gaze_line: Line | None = None
-        self.sensor_sphere: Sphere | None = None
+        self.agent_sphere: Sphere | None = None
         self.text_label: Text2D = Text2D(
             txt="Ground Truth", pos="top-center", font=FONT
         )
@@ -397,7 +397,7 @@ class GtMeshWidgetOps:
             ]
         )
 
-        locators["sensor_location"] = DataLocator(
+        locators["agent_location"] = DataLocator(
             path=[
                 DataLocatorStep.key(name="episode"),
                 DataLocatorStep.key(name="system", value="motor_system"),
@@ -467,9 +467,7 @@ class GtMeshWidgetOps:
 
         return widget, False
 
-    def update_sensor(
-        self, widget: None, msgs: list[TopicMessage]
-    ) -> tuple[None, bool]:
+    def update_agent(self, widget: None, msgs: list[TopicMessage]) -> tuple[None, bool]:
         msgs_dict = {msg.name: msg.value for msg in msgs}
         episode_number = msgs_dict["episode_number"]
         step_number = msgs_dict["step_number"]
@@ -479,8 +477,8 @@ class GtMeshWidgetOps:
         )
         mapping = np.flatnonzero(steps_mask)
 
-        sensor_pos = self.data_parser.extract(
-            self._locators["sensor_location"],
+        agent_pos = self.data_parser.extract(
+            self._locators["agent_location"],
             episode=str(episode_number),
             sm_step=int(mapping[step_number]),
         )
@@ -491,15 +489,22 @@ class GtMeshWidgetOps:
             step=step_number,
         )
 
-        if self.sensor_sphere is None:
-            self.sensor_sphere = Sphere(pos=sensor_pos, r=0.002)
-            self.plotter.at(1).add(self.sensor_sphere)
-        self.sensor_sphere.pos(sensor_pos)
+        if self.agent_sphere is None:
+            self.agent_sphere = Sphere(
+                pos=agent_pos,
+                r=0.004,
+                c=HUE_PALETTE["Secondary"],
+            )
+
+            self.plotter.at(1).add(self.agent_sphere)
+        self.agent_sphere.pos(agent_pos)
 
         if self.gaze_line is None:
-            self.gaze_line = Line(sensor_pos, patch_pos, c="black", lw=2)
+            self.gaze_line = Line(
+                agent_pos, patch_pos, c=Palette.as_hex("rich_black"), lw=4
+            )
             self.plotter.at(1).add(self.gaze_line)
-        self.gaze_line.points = [sensor_pos, patch_pos]
+        self.gaze_line.points = [agent_pos, patch_pos]
 
         return widget, False
 
