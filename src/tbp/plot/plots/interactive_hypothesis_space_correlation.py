@@ -1476,6 +1476,8 @@ class CorrelationPlotWidgetOps:
                 df_removed = DataFrame(
                     {
                         "id": removed_ids,
+                        "episode": dec_episode,
+                        "step": dec_step,
                         "graph_id": graph_id,
                         "Evidence": np.array(dec_channel_data["evidence"])[removed_ids],
                         "Evidence Slope": np.array(dec_updater_data["evidence_slopes"])[
@@ -1515,6 +1517,8 @@ class CorrelationPlotWidgetOps:
                 df_added = DataFrame(
                     {
                         "id": added_ids,
+                        "episode": episode,
+                        "step": step,
                         "graph_id": graph_id,
                         "Evidence": np.array(channel_data["evidence"])[added_ids],
                         "Evidence Slope": np.array(updater_data["evidence_slopes"])[
@@ -1541,6 +1545,8 @@ class CorrelationPlotWidgetOps:
                 df_maintained = DataFrame(
                     {
                         "id": maintained_ids,
+                        "episode": episode,
+                        "step": step,
                         "graph_id": graph_id,
                         "Evidence": np.array(channel_data["evidence"])[maintained_ids],
                         "Evidence Slope": np.array(updater_data["evidence_slopes"])[
@@ -1579,6 +1585,8 @@ class CorrelationPlotWidgetOps:
             return DataFrame(
                 columns=[
                     "id",
+                    "episode",
+                    "step",
                     "graph_id",
                     "Evidence",
                     "Evidence Slope",
@@ -1868,13 +1876,17 @@ class HypothesisMeshWidgetOps:
 
     Attributes:
         plotter: A `vedo.Plotter` used to add and remove actors.
+        data_parser: Parser that extracts entries from the JSON log.
         ycb_loader: Loader that returns a textured `vedo.Mesh` for a YCB object.
         updaters: Two `WidgetUpdater`s for clear and update actions.
         info_widget: The text panel shown alongside the mesh.
     """
 
-    def __init__(self, plotter: Plotter, ycb_loader: YCBMeshLoader) -> None:
+    def __init__(
+        self, plotter: Plotter, data_parser: DataParser, ycb_loader: YCBMeshLoader
+    ) -> None:
         self.plotter = plotter
+        self.data_parser = data_parser
         self.ycb_loader = ycb_loader
         self.updaters = [
             WidgetUpdater(
@@ -1893,6 +1905,13 @@ class HypothesisMeshWidgetOps:
                 ],
                 callback=self.update_transparency,
             ),
+            WidgetUpdater(
+                topics=[
+                    TopicSpec("selected_hypothesis", required=True),
+                    EventSpec("KeyPressed", "KeyPressEvent", required=False),
+                ],
+                callback=self.update_paths,
+            ),
         ]
         self.mesh_transparency: float = 0.0
         self.default_object_position = (0, 1.5, 0)
@@ -1901,16 +1920,183 @@ class HypothesisMeshWidgetOps:
             txt="Selected Hypothesis", pos="top-center", font=FONT
         )
 
+        # Path visibility states
+        self.show_past_path: bool = False
+        self.show_future_path: bool = False
+
+        self.past_path_spheres: list[Sphere] = []
+        self.future_path_spheres: list[Sphere] = []
+        self.past_path_line: Line | None = None
+        self.future_path_line: Line | None = None
+
+        self._locators = self.create_locators()
+
         self.plotter.at(2).add(self.text_label)
+
+    def create_locators(self) -> dict[str, DataLocator]:
+        """Returns data locators needed to trace the hypothesis."""
+        locators: dict[str, DataLocator] = {}
+
+        locators["episode"] = DataLocator(path=[DataLocatorStep.key(name="episode")])
+
+        locators["step"] = locators["episode"].extend(
+            steps=[
+                DataLocatorStep.key(name="lm", value="LM_0"),
+                DataLocatorStep.key(
+                    name="telemetry", value="hypotheses_updater_telemetry"
+                ),
+                DataLocatorStep.index(name="step"),
+            ]
+        )
+
+        locators["channel"] = locators["step"].extend(
+            steps=[
+                DataLocatorStep.key(name="obj"),
+                DataLocatorStep.key(name="channel", value="patch"),
+            ]
+        )
+
+        locators["updater"] = locators["channel"].extend(
+            steps=[DataLocatorStep.key(name="stat", value="hypotheses_updater")]
+        )
+
+        return locators
+
+    def _extract_channel_data(
+        self, episode: str, step: int, obj: str
+    ) -> dict[str, Iterable]:
+        channel_data = self.data_parser.extract(
+            self._locators["channel"], episode=episode, step=step, obj=obj
+        )
+        updater_data = self.data_parser.extract(
+            self._locators["updater"], episode=episode, step=step, obj=obj
+        )
+        return {
+            "locations": channel_data["locations"],
+            "evidence": channel_data["evidence"],
+            "evidence_slopes": updater_data["evidence_slopes"],
+        }
+
+    def _extract_mod_ids(
+        self, episode: str, step: int, obj: str
+    ) -> tuple[Iterable[int], Iterable[int]]:
+        """Return added and removed hypothesis ids."""
+        updater_data = self.data_parser.extract(
+            self._locators["updater"], episode=episode, step=step, obj=obj
+        )
+        return updater_data["added_ids"], updater_data["removed_ids"]
+
+    def _num_steps_in_episode(self, episode: str) -> int:
+        return len(self.data_parser.query(self._locators["step"], episode=episode))
+
+    def _num_episodes(self) -> int:
+        return len(self.data_parser.query(self._locators["episode"]))
+
+    def _increment_location_pair(
+        self, episode: str, step: int
+    ) -> tuple[str | None, int | None]:
+        ep = int(episode)
+        num_episodes = self._num_episodes()
+        steps_here = self._num_steps_in_episode(episode)
+
+        if step < steps_here - 1:
+            return episode, step + 1
+
+        if ep < num_episodes - 1:
+            return str(ep + 1), 0
+
+        return None, None
+
+    def _decrement_location_pair(
+        self, episode: str, step: int
+    ) -> tuple[str | None, int | None]:
+        ep = int(episode)
+        if step > 0:
+            return episode, step - 1
+
+        if ep > 0:
+            prev_ep = str(ep - 1)
+            return prev_ep, self._num_steps_in_episode(prev_ep) - 1
+
+        return None, None
+
+    def _trace_hypothesis_positions(
+        self, episode: str, step: int, obj: str, ix: int
+    ) -> DataFrame:
+        # Current row
+        row_data = self._extract_channel_data(episode, step, obj)
+        rows: list[dict] = [
+            {
+                "Episode": int(episode),
+                "Step": int(step),
+                "Loc_x": row_data["locations"][ix][0],
+                "Loc_y": row_data["locations"][ix][1],
+                "Loc_z": row_data["locations"][ix][2],
+            }
+        ]
+
+        # Backward
+        rows_back: list[dict] = []
+        episode_b, step_b, idx_b = episode, step, ix
+        while True:
+            added_ids, removed_ids = self._extract_mod_ids(episode_b, step_b, obj)
+            idx_prev = trace_hypothesis_backward(
+                idx_b, removed_ids=sorted(removed_ids), added_ids=sorted(added_ids)
+            )
+            if idx_prev is None:
+                break
+
+            episode_prev, step_prev = self._decrement_location_pair(episode_b, step_b)
+            if episode_prev is None or step_prev is None:
+                break
+
+            episode_b, step_b, idx_b = episode_prev, step_prev, idx_prev
+            row_data = self._extract_channel_data(episode_b, step_b, obj)
+            rows_back.append(
+                {
+                    "Episode": int(episode_b),
+                    "Step": int(step_b),
+                    "Loc_x": row_data["locations"][idx_b][0],
+                    "Loc_y": row_data["locations"][idx_b][1],
+                    "Loc_z": row_data["locations"][idx_b][2],
+                }
+            )
+
+        # Forward
+        rows_forward: list[dict] = []
+        episode_f, step_f, idx_f = episode, step, ix
+        while True:
+            episode_next, step_next = self._increment_location_pair(episode_f, step_f)
+            if episode_next is None or step_next is None:
+                break
+
+            _, removed_ids = self._extract_mod_ids(episode_next, step_next, obj)
+            idx_next = trace_hypothesis_forward(idx_f, removed_ids=sorted(removed_ids))
+            if idx_next is None:
+                break
+
+            episode_f, step_f, idx_f = episode_next, step_next, idx_next
+            row_data = self._extract_channel_data(episode_f, step_f, obj)
+            rows_forward.append(
+                {
+                    "Episode": int(episode_f),
+                    "Step": int(step_f),
+                    "Loc_x": row_data["locations"][idx_f][0],
+                    "Loc_y": row_data["locations"][idx_f][1],
+                    "Loc_z": row_data["locations"][idx_f][2],
+                }
+            )
+
+        rows_back.reverse()
+        all_rows = rows_back + rows + rows_forward
+        return DataFrame(
+            all_rows, columns=["Episode", "Step", "Loc_x", "Loc_y", "Loc_z"]
+        )
 
     def clear_mesh(
         self, widget: Mesh | None, msgs: list[TopicMessage]
     ) -> tuple[Any, bool]:
         """Clear the mesh and info panel if present.
-
-        Args:
-            widget: Current mesh object, if any.
-            msgs: Unused. Present for the updater interface.
 
         Returns:
             `(widget, False)` to indicate no publish should occur.
@@ -1922,6 +2108,9 @@ class HypothesisMeshWidgetOps:
             self.plotter.at(2).remove(self.sensor_sphere)
             self.sensor_sphere = None
 
+        self._clear_paths()
+
+        self.updaters[3].expire_topic("selected_hypothesis")
         return widget, False
 
     def update_mesh(
@@ -1957,9 +2146,10 @@ class HypothesisMeshWidgetOps:
 
         # Add sphere for sensor's hypothesized location
         sensor_pos = (hypothesis["Loc_x"], hypothesis["Loc_y"], hypothesis["Loc_z"])
-        self.sensor_sphere = Sphere(pos=sensor_pos, r=0.002).c("green")
-        self.sensor_sphere.pos(sensor_pos)
+        self.sensor_sphere = Sphere(pos=sensor_pos, r=0.003).c(HUE_PALETTE["Primary"])
         self.plotter.at(2).add(self.sensor_sphere)
+
+        self.updaters[1].expire_topic("selected_hypothesis")
 
         return widget, False
 
@@ -1982,6 +2172,100 @@ class HypothesisMeshWidgetOps:
             widget.alpha(1.0 - self.mesh_transparency)
 
         self.updaters[2].expire_topic("KeyPressEvent")
+
+        return widget, False
+
+    def _clear_paths(self) -> None:
+        for s in self.past_path_spheres:
+            self.plotter.at(2).remove(s)
+        for s in self.future_path_spheres:
+            self.plotter.at(2).remove(s)
+
+        self.past_path_spheres.clear()
+        self.future_path_spheres.clear()
+
+        if self.past_path_line is not None:
+            self.plotter.at(2).remove(self.past_path_line)
+            self.past_path_line = None
+        if self.future_path_line is not None:
+            self.plotter.at(2).remove(self.future_path_line)
+            self.future_path_line = None
+
+    def _rebuild_paths(
+        self,
+        episode: str,
+        step: int,
+        hyp: Series,
+    ) -> None:
+        self._clear_paths()
+
+        if not (self.show_past_path or self.show_future_path):
+            return
+
+        df = self._trace_hypothesis_positions(
+            episode=episode,
+            step=step,
+            obj=hyp["graph_id"],
+            ix=int(hyp["id"]),
+        )
+        if df.empty:
+            return
+
+        df = df.reset_index(drop=True)
+        mask_current = (df["Episode"] == int(episode)) & (df["Step"] == step)
+        idx_list = df.index[mask_current].tolist()
+        current_idx = idx_list[0]
+
+        if self.show_past_path:
+            past_pts = df.loc[:current_idx, ["Loc_x", "Loc_y", "Loc_z"]].to_numpy()
+            self._build_path_geometry(past_pts, past=True)
+
+        if self.show_future_path and current_idx < len(df) - 1:
+            future_pts = df.loc[
+                current_idx + 1 :, ["Loc_x", "Loc_y", "Loc_z"]
+            ].to_numpy()
+            self._build_path_geometry(future_pts, past=False)
+
+    def _build_path_geometry(self, points: np.ndarray, past: bool) -> None:
+        if points.size == 0:
+            return
+
+        spheres_list = self.past_path_spheres if past else self.future_path_spheres
+        line_attr = "past_path_line" if past else "future_path_line"
+        color = HUE_PALETTE["Primary"]
+
+        for p in points:
+            s = Sphere(pos=p, r=0.002, c=color)
+            self.plotter.at(2).add(s)
+            spheres_list.append(s)
+
+        if len(points) >= 2:
+            line = Line(points, c=color, lw=1)
+            setattr(self, line_attr, line)
+            self.plotter.at(2).add(line)
+
+    def update_paths(
+        self, widget: Mesh | None, msgs: list[TopicMessage]
+    ) -> tuple[Mesh | None, bool]:
+        msgs_dict = {msg.name: msg.value for msg in msgs}
+
+        hyp: Series = msgs_dict["selected_hypothesis"]
+        episode = str(hyp["episode"])
+        step = int(hyp["step"])
+
+        key_event = msgs_dict.get("KeyPressEvent", None)
+        if key_event is not None and getattr(key_event, "at", None) == 2:
+            key = getattr(key_event, "keypress", None)
+            if key == "s":
+                self.show_past_path = not self.show_past_path
+            elif key == "S":
+                self.show_future_path = not self.show_future_path
+            elif key == "d":
+                self.show_past_path = False
+                self.show_future_path = False
+
+        self._rebuild_paths(episode=episode, step=step, hyp=hyp)
+        self.updaters[3].expire_topic("KeyPressEvent")
 
         return widget, False
 
@@ -2578,13 +2862,12 @@ class HypothesisLifespanWidgetOps:
         step = int(msgs_dict["step_number"])
         hyp = msgs_dict["selected_hypothesis"]
 
-        if hyp["kind"] == "Removed":
-            prev_episode, prev_step = self._decrement_location_pair(episode, step)
-            df = self._trace_hypothesis(
-                prev_episode, prev_step, hyp["graph_id"], hyp["id"]
-            )
-        else:
-            df = self._trace_hypothesis(episode, step, hyp["graph_id"], hyp["id"])
+        df = self._trace_hypothesis(
+            str(hyp["episode"]),
+            int(hyp["step"]),
+            hyp["graph_id"],
+            hyp["id"],
+        )
 
         widget = self._add_lifespan_figure(
             df, current_episode=int(episode), current_step=step
@@ -2817,6 +3100,7 @@ class InteractivePlot:
         widgets["hypothesis_mesh"] = Widget[Mesh, None](
             widget_ops=HypothesisMeshWidgetOps(
                 plotter=self.plotter,
+                data_parser=self.data_parser,
                 ycb_loader=self.ycb_loader,
             ),
             scopes=[3],
