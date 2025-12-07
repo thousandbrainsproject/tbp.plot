@@ -31,6 +31,7 @@ from tbp.interactive.data import (
     DataParser,
     YCBMeshLoader,
 )
+from tbp.interactive.events import EventSpec
 from tbp.interactive.scopes import ScopeViewer
 from tbp.interactive.topics import TopicMessage, TopicSpec
 from tbp.interactive.utils import (
@@ -355,6 +356,7 @@ class GtMeshWidgetOps:
                 topics=[
                     TopicSpec("episode_number", required=True),
                     TopicSpec("step_number", required=True),
+                    EventSpec("KeyPressed", "KeyPressEvent", required=False),
                 ],
                 callback=self.update_agent,
             ),
@@ -372,6 +374,23 @@ class GtMeshWidgetOps:
         self.text_label: Text2D = Text2D(
             txt="Ground Truth", pos="top-center", font=FONT
         )
+
+        # Path visibility flags
+        self.show_agent_past: bool = False
+        self.show_agent_future: bool = False
+        self.show_patch_past: bool = False
+        self.show_patch_future: bool = False
+
+        # Path geometry
+        self.agent_past_spheres: list[Sphere] = []
+        self.agent_past_line: Line | None = None
+        self.agent_future_spheres: list[Sphere] = []
+        self.agent_future_line: Line | None = None
+
+        self.patch_past_spheres: list[Sphere] = []
+        self.patch_past_line: Line | None = None
+        self.patch_future_spheres: list[Sphere] = []
+        self.patch_future_line: Line | None = None
 
         self.plotter.at(1).add(self.text_label)
 
@@ -430,6 +449,42 @@ class GtMeshWidgetOps:
         if widget is not None:
             self.plotter.at(1).remove(widget)
             self.plotter.at(1).render()
+
+    def _clear_agent_paths(self) -> None:
+        for s in self.agent_past_spheres:
+            self.plotter.at(1).remove(s)
+        for s in self.agent_future_spheres:
+            self.plotter.at(1).remove(s)
+
+        self.agent_past_spheres.clear()
+        self.agent_future_spheres.clear()
+
+        if self.agent_past_line is not None:
+            self.plotter.at(1).remove(self.agent_past_line)
+            self.agent_past_line = None
+        if self.agent_future_line is not None:
+            self.plotter.at(1).remove(self.agent_future_line)
+            self.agent_future_line = None
+
+    def _clear_patch_paths(self) -> None:
+        for s in self.patch_past_spheres:
+            self.plotter.at(1).remove(s)
+        for s in self.patch_future_spheres:
+            self.plotter.at(1).remove(s)
+
+        self.patch_past_spheres.clear()
+        self.patch_future_spheres.clear()
+
+        if self.patch_past_line is not None:
+            self.plotter.at(1).remove(self.patch_past_line)
+            self.patch_past_line = None
+        if self.patch_future_line is not None:
+            self.plotter.at(1).remove(self.patch_future_line)
+            self.patch_future_line = None
+
+    def _clear_all_paths(self) -> None:
+        self._clear_agent_paths()
+        self._clear_patch_paths()
 
     def update_mesh(self, widget: Mesh, msgs: list[TopicMessage]) -> tuple[Mesh, bool]:
         """Update the target mesh when the episode changes.
@@ -506,7 +561,125 @@ class GtMeshWidgetOps:
             self.plotter.at(1).add(self.gaze_line)
         self.gaze_line.points = [agent_pos, patch_pos]
 
+        self._clear_all_paths()
+        key_event = msgs_dict.get("KeyPressEvent", None)
+        if key_event is not None and getattr(key_event, "at", None) == 1:
+            key = getattr(key_event, "keypress", None)
+
+            if key == "a":
+                self.show_agent_past = not self.show_agent_past
+            elif key == "A":
+                self.show_agent_future = not self.show_agent_future
+            elif key == "s":
+                self.show_patch_past = not self.show_patch_past
+            elif key == "S":
+                self.show_patch_future = not self.show_patch_future
+            elif key == "d":
+                self.show_agent_past = False
+                self.show_agent_future = False
+                self.show_patch_past = False
+                self.show_patch_future = False
+
+        # expire the event so it only affects this call
+        self.updaters[1].expire_topic("KeyPressEvent")
+
+        max_idx = len(mapping) - 1
+        curr_idx = int(np.clip(step_number, 0, max_idx))
+
+        if self.show_agent_past or self.show_agent_future:
+            self._rebuild_agent_paths(episode_number, mapping, curr_idx)
+
+        if self.show_patch_past or self.show_patch_future:
+            self._rebuild_patch_paths(episode_number, len(mapping), curr_idx)
+
         return widget, False
+
+    def _rebuild_agent_paths(
+        self,
+        episode_number: int,
+        mapping: np.ndarray,
+        curr_idx: int,
+    ) -> None:
+        """Rebuild past/future agent paths."""
+        # Collect all agent positions
+        agent_positions: list[np.ndarray] = []
+        for k in range(len(mapping)):
+            pos = self.data_parser.extract(
+                self._locators["agent_location"],
+                episode=str(episode_number),
+                sm_step=int(mapping[k]),
+            )
+            agent_positions.append(pos)
+
+        if self.show_agent_past and agent_positions:
+            past_pts = agent_positions[: curr_idx + 1]
+            for p in past_pts:
+                s = Sphere(pos=p, r=0.002, c=HUE_PALETTE["Secondary"])
+                self.plotter.at(1).add(s)
+                self.agent_past_spheres.append(s)
+            if len(past_pts) >= 2:
+                self.agent_past_line = Line(past_pts, c=HUE_PALETTE["Secondary"], lw=1)
+                self.plotter.at(1).add(self.agent_past_line)
+
+        if (
+            self.show_agent_future
+            and agent_positions
+            and curr_idx < len(agent_positions) - 1
+        ):
+            future_pts = agent_positions[curr_idx + 1 :]
+            for p in future_pts:
+                s = Sphere(pos=p, r=0.002, c=HUE_PALETTE["Secondary"])
+                self.plotter.at(1).add(s)
+                self.agent_future_spheres.append(s)
+            if len(future_pts) >= 2:
+                self.agent_future_line = Line(
+                    future_pts, c=HUE_PALETTE["Secondary"], lw=1
+                )
+                self.plotter.at(1).add(self.agent_future_line)
+
+    def _rebuild_patch_paths(
+        self,
+        episode_number: int,
+        num_steps: int,
+        curr_idx: int,
+    ) -> None:
+        """Rebuild past/future patch (sensor) paths."""
+        patch_positions: list[np.ndarray] = []
+        for k in range(num_steps):
+            pos = self.data_parser.extract(
+                self._locators["patch_location"],
+                episode=str(episode_number),
+                step=k,
+            )
+            patch_positions.append(pos)
+
+        if self.show_patch_past and patch_positions:
+            past_pts = patch_positions[: curr_idx + 1]
+            for p in past_pts:
+                s = Sphere(pos=p, r=0.002, c=Palette.as_hex("rich_black"))
+                self.plotter.at(1).add(s)
+                self.patch_past_spheres.append(s)
+            if len(past_pts) >= 2:
+                self.patch_past_line = Line(
+                    past_pts, c=Palette.as_hex("rich_black"), lw=1
+                )
+                self.plotter.at(1).add(self.patch_past_line)
+
+        if (
+            self.show_patch_future
+            and patch_positions
+            and curr_idx < len(patch_positions) - 1
+        ):
+            future_pts = patch_positions[curr_idx + 1 :]
+            for p in future_pts:
+                s = Sphere(pos=p, r=0.002, c=Palette.as_hex("rich_black"))
+                self.plotter.at(1).add(s)
+                self.patch_future_spheres.append(s)
+            if len(future_pts) >= 2:
+                self.patch_future_line = Line(
+                    future_pts, c=Palette.as_hex("rich_black"), lw=1
+                )
+                self.plotter.at(1).add(self.patch_future_line)
 
     def update_transparency(
         self, widget: None, msgs: list[TopicMessage]
