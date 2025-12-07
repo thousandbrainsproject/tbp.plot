@@ -348,7 +348,6 @@ class GtMeshWidgetOps:
             WidgetUpdater(
                 topics=[
                     TopicSpec("episode_number", required=True),
-                    TopicSpec("transparency_value", required=True),
                 ],
                 callback=self.update_mesh,
             ),
@@ -362,7 +361,7 @@ class GtMeshWidgetOps:
             ),
             WidgetUpdater(
                 topics=[
-                    TopicSpec("transparency_value", required=True),
+                    EventSpec("KeyPressed", "KeyPressEvent", required=True),
                 ],
                 callback=self.update_transparency,
             ),
@@ -376,6 +375,7 @@ class GtMeshWidgetOps:
         )
 
         # Path visibility flags
+        self.mesh_transparency: float = 0.0
         self.show_agent_past: bool = False
         self.show_agent_future: bool = False
         self.show_patch_past: bool = False
@@ -516,7 +516,7 @@ class GtMeshWidgetOps:
         widget.rotate_y(target_rot[1])
         widget.rotate_z(target_rot[2])
         widget.shift(*target_pos)
-        widget.alpha(1.0 - msgs_dict["transparency_value"])
+        widget.alpha(1.0 - self.mesh_transparency)
 
         self.plotter.at(1).add(widget)
 
@@ -685,8 +685,22 @@ class GtMeshWidgetOps:
         self, widget: None, msgs: list[TopicMessage]
     ) -> tuple[None, bool]:
         msgs_dict = {msg.name: msg.value for msg in msgs}
+
+        key_event = msgs_dict.get("KeyPressEvent", None)
+        if key_event is not None and getattr(key_event, "at", None) == 1:
+            key = getattr(key_event, "keypress", None)
+
+            if key == "Left":
+                self.mesh_transparency -= 0.5
+            elif key == "Right":
+                self.mesh_transparency += 0.5
+
+        self.mesh_transparency = float(np.clip(self.mesh_transparency, 0.0, 1.0))
         if widget is not None:
-            widget.alpha(1.0 - msgs_dict["transparency_value"])
+            widget.alpha(1.0 - self.mesh_transparency)
+
+        self.updaters[2].expire_topic("KeyPressEvent")
+
         return widget, False
 
 
@@ -911,40 +925,38 @@ class AgeThresholdWidgetOps:
         return [TopicMessage(name="age_threshold", value=state)]
 
 
-class TransparencySliderWidgetOps:
-    """WidgetOps implementation for the transparency slider.
+class TopKSliderWidgetOps:
+    """WidgetOps implementation for the TopK slider.
 
-    This widget provides a slider to control the transparency of the mesh
-    object. It publishes on the topic `transparency_value` a float value between 0.0
-    and 1.0.
+    This widget provides a slider to control the number of top-k highlighted hypotheses.
+    It publishes on the topic `top_k` an int value between 0 and 5.
     """
 
     def __init__(self, plotter: Plotter) -> None:
         self.plotter = plotter
 
         self._add_kwargs = {
-            "xmin": 0.0,
-            "xmax": 1.0,
-            "value": 0.0,
+            "xmin": 0,
+            "xmax": 5,
+            "value": 0,
             "pos": [(0.77, 0.01), (0.77, 0.3)],
-            "title": "Mesh Transparency",
+            "title": "Top-K Highlighted",
             "font": FONT,
         }
 
     def add(self, callback: Callable) -> Slider2D:
         widget = self.plotter.at(0).add_slider(callback, **self._add_kwargs)
-        # widget.GetRepresentation().SetLabelHeight(0.05)
         self.plotter.at(0).render()
         return widget
 
-    def extract_state(self, widget: Slider2D) -> float:
-        return extract_slider_state(widget, round_value=False)
+    def extract_state(self, widget: Slider2D) -> int:
+        return extract_slider_state(widget)
 
-    def set_state(self, widget: Slider2D, value: float) -> None:
+    def set_state(self, widget: Slider2D, value: int) -> None:
         set_slider_state(widget, value)
 
     def state_to_messages(self, state: float) -> Iterable[TopicMessage]:
-        return [TopicMessage(name="transparency_value", value=state)]
+        return [TopicMessage(name="top_k", value=state)]
 
 
 class CurrentObjectWidgetOps:
@@ -1268,6 +1280,7 @@ class CorrelationPlotWidgetOps:
                     TopicSpec("step_number", required=True),
                     TopicSpec("current_object", required=True),
                     TopicSpec("age_threshold", required=True),
+                    TopicSpec("top_k", required=True),
                 ],
                 callback=self.update_plot,
             ),
@@ -1287,7 +1300,7 @@ class CorrelationPlotWidgetOps:
         self.df: DataFrame
         self.selected_hypothesis: Series | None = None
         self.highlight_circle: Circle | None = None
-        self.mlh_circle: Circle | None = None
+        self.mlh_circles: list[Circle] = []
         self.info_widget: Text2D | None = None
 
     def create_locators(self) -> dict[str, DataLocator]:
@@ -1702,30 +1715,43 @@ class CorrelationPlotWidgetOps:
         self.info_widget = Text2D(txt=text, pos="top-left", font=FONT)
         self.plotter.at(0).add(self.info_widget)
 
-    def add_mlh_circle(self):
-        """Adds the circle marker for the MLH."""
-        if self.mlh_circle is not None:
-            self.plotter.at(0).remove(self.mlh_circle)
+    def add_mlh_circles(self, top_k: int) -> None:
+        """Adds the circle markers for the MLH."""
+        for c in self.mlh_circles:
+            self.plotter.at(0).remove(c)
+        self.mlh_circles.clear()
 
-        df_valid = self.df[self.df["kind"] != "Removed"]
+        if self.df is None or self.df.empty:
+            return
 
+        df_valid = self.df[self.df["kind"] != "Removed"].copy()
         if df_valid.empty:
             return
 
-        idx = df_valid["Evidence"].idxmax()
-        (slope, error) = tuple(df_valid.loc[idx, ["Evidence Slope", "Pose Error"]])
+        df_valid.sort_values("Evidence", ascending=False, inplace=True)
 
-        if pd.isna(slope):
+        # Clamp to [0, len(df_valid)]
+        k = int(max(0, min(top_k, len(df_valid))))
+        if k == 0:
             return
 
-        # Map location back to a Location3D in GUI Space
-        gui_location = self._coordinate_mapper.map_data_coords_to_world(
-            Location2D(slope, error)
-        ).to_3d(z=0.05)
+        top_rows = df_valid.head(k)
 
-        self.mlh_circle = Circle(pos=gui_location.to_numpy(), r=3.0, res=16)
-        self.mlh_circle.c("green")
-        self.plotter.at(0).add(self.mlh_circle)
+        for _, row in top_rows.iterrows():
+            slope = row["Evidence Slope"]
+            error = row["Pose Error"]
+
+            if pd.isna(slope) or pd.isna(error):
+                continue
+
+            gui_location = self._coordinate_mapper.map_data_coords_to_world(
+                Location2D(float(slope), float(error))
+            ).to_3d(z=0.05)
+
+            circle = Circle(pos=gui_location.to_numpy(), r=3.0, res=16)
+            circle.c("green")
+            self.plotter.at(0).add(circle)
+            self.mlh_circles.append(circle)
 
     def add_highlight_circle(self, gui_location: Location3D):
         """Adds the circle marker for the selected hypothesis.
@@ -1778,7 +1804,7 @@ class CorrelationPlotWidgetOps:
         self.add_info_text()
 
         # Add mlh circle to scene
-        self.add_mlh_circle()
+        self.add_mlh_circles(msgs_dict["top_k"])
 
         return widget, True
 
@@ -1858,11 +1884,17 @@ class HypothesisMeshWidgetOps:
             WidgetUpdater(
                 topics=[
                     TopicSpec("selected_hypothesis", required=True),
-                    TopicSpec("transparency_value", required=True),
                 ],
                 callback=self.update_mesh,
             ),
+            WidgetUpdater(
+                topics=[
+                    EventSpec("KeyPressed", "KeyPressEvent", required=True),
+                ],
+                callback=self.update_transparency,
+            ),
         ]
+        self.mesh_transparency: float = 0.0
         self.default_object_position = (0, 1.5, 0)
         self.sensor_sphere: Sphere | None = None
         self.text_label: Text2D = Text2D(
@@ -1920,7 +1952,7 @@ class HypothesisMeshWidgetOps:
         widget.rotate_y(hypothesis["Rot_y"])
         widget.rotate_z(hypothesis["Rot_z"])
         widget.shift(self.default_object_position)
-        widget.alpha(1.0 - msgs_dict["transparency_value"])
+        widget.alpha(1.0 - self.mesh_transparency)
         self.plotter.at(2).add(widget)
 
         # Add sphere for sensor's hypothesized location
@@ -1928,6 +1960,28 @@ class HypothesisMeshWidgetOps:
         self.sensor_sphere = Sphere(pos=sensor_pos, r=0.002).c("green")
         self.sensor_sphere.pos(sensor_pos)
         self.plotter.at(2).add(self.sensor_sphere)
+
+        return widget, False
+
+    def update_transparency(
+        self, widget: None, msgs: list[TopicMessage]
+    ) -> tuple[None, bool]:
+        msgs_dict = {msg.name: msg.value for msg in msgs}
+
+        key_event = msgs_dict.get("KeyPressEvent", None)
+        if key_event is not None and getattr(key_event, "at", None) == 2:
+            key = getattr(key_event, "keypress", None)
+
+            if key == "Left":
+                self.mesh_transparency -= 0.5
+            elif key == "Right":
+                self.mesh_transparency += 0.5
+
+        self.mesh_transparency = float(np.clip(self.mesh_transparency, 0.0, 1.0))
+        if widget is not None:
+            widget.alpha(1.0 - self.mesh_transparency)
+
+        self.updaters[2].expire_topic("KeyPressEvent")
 
         return widget, False
 
@@ -2618,7 +2672,7 @@ class InteractivePlot:
             w.add()
         self._widgets["episode_slider"].set_state(0)
         self._widgets["age_threshold"].set_state(0)
-        self._widgets["transparency_slider"].set_state(0.0)
+        self._widgets["topk_slider"].set_state(0)
 
         self.scope_viewer = ScopeViewer(self.plotter, self._widgets)
         self.plotter.add_callback("KeyPress", self._on_keypress_quit)
@@ -2718,11 +2772,11 @@ class InteractivePlot:
             dedupe=True,
         )
 
-        widgets["transparency_slider"] = Widget[Slider2D, float](
-            widget_ops=TransparencySliderWidgetOps(
+        widgets["topk_slider"] = Widget[Slider2D, int](
+            widget_ops=TopKSliderWidgetOps(
                 plotter=self.plotter,
             ),
-            scopes=[1, 3],
+            scopes=[2],
             bus=self.event_bus,
             scheduler=self.scheduler,
             debounce_sec=0.1,
