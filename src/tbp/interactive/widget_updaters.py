@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+from tbp.interactive.events import EventSpec
 from tbp.interactive.topics import TopicMessage, TopicSpec
 
 if TYPE_CHECKING:
@@ -56,7 +57,7 @@ class WidgetUpdater[WidgetT]:
             `topics`.
     """
 
-    topics: Iterable[TopicSpec]
+    topics: Iterable[TopicSpec | EventSpec]
     callback: Callable[
         [WidgetT | None, list[TopicMessage]], tuple[WidgetT | None, bool]
     ]
