@@ -18,6 +18,9 @@ from typing import TYPE_CHECKING, Any
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib import transforms
+from matplotlib.lines import Line2D
+from matplotlib.patches import Rectangle
 from pubsub.core import Publisher
 from vedo import Button, Image, Line, Mesh, Plotter, Points, Slider2D, Sphere
 
@@ -1109,6 +1112,19 @@ class LinePlotWidgetOps:
         if widget is not None:
             self.plotter.at(0).remove(widget)
 
+    def _get_object_segments(self) -> list[tuple[int, int, str]]:
+        segments = []
+        global_offset = 0
+        for episode in self.data_parser.query(self._locators["evidence"]):
+            obj = self.data_parser.extract(self._locators["target"], episode=episode)
+            num_steps = len(
+                self.data_parser.query(self._locators["evidence"], episode=episode)
+            )
+            segments.append((global_offset, global_offset + num_steps - 1, obj))
+            global_offset += num_steps
+
+        return segments
+
     def _get_bursts(self) -> list[bool]:
         bursts = []
         for episode in self.data_parser.query(self._locators["evidence"]):
@@ -1193,9 +1209,9 @@ class LinePlotWidgetOps:
         fig, ax_left = plt.subplots(1, 1, figsize=(14, 3), dpi=200)
         ax_right = ax_left.twinx()
 
+        # Max slopes don't start from 0
         valid_idx = np.where(~np.isnan(slopes))[0]
         start_idx = int(valid_idx[0]) if valid_idx.size > 0 else 0
-
         if start_idx < len(slopes):
             ax_left.plot(
                 x[start_idx:],
@@ -1212,6 +1228,17 @@ class LinePlotWidgetOps:
             label="Hypothesis space size",
         )
 
+        # Fill area under the curve for hyp space size
+        ax_right.fill_between(
+            x,
+            hyp_space_sizes,
+            0.0,
+            alpha=0.15,
+            color=Palette.as_hex("numenta_blue"),
+            zorder=0,
+        )
+
+        # Set axes limits
         ax_left.set_ylim(-1.0, 2.0)
         ax_right.set_ylim(0, 10000)
 
@@ -1248,22 +1275,86 @@ class LinePlotWidgetOps:
         ax_left.set_ylabel("Max slope")
         ax_right.set_ylabel("Hyp space size")
 
-        # Merge legends and place above
+        # Collect legend entries
         lines_left, labels_left = ax_left.get_legend_handles_labels()
         lines_right, labels_right = ax_right.get_legend_handles_labels()
+
         all_lines = lines_left + lines_right
         all_labels = labels_left + labels_right
 
-        if all_lines:
-            ax_left.legend(
-                all_lines,
-                all_labels,
-                loc="upper center",
-                bbox_to_anchor=(0.5, 1.20),
-                ncol=len(all_lines),
+        # Create two legend boxes above the plot
+        data_lines: list[Line2D] = []
+        data_labels: list[str] = []
+        time_lines: list[Line2D] = []
+        time_labels: list[str] = []
+
+        for line, label in zip(all_lines, all_labels, strict=True):
+            if label in ("Max slope", "Hypothesis space size"):
+                data_lines.append(line)
+                data_labels.append(label)
+            elif label in ("Burst", "Current step"):
+                time_lines.append(line)
+                time_labels.append(label)
+
+        if data_lines:
+            legend_metrics = ax_left.legend(
+                data_lines,
+                data_labels,
+                loc="upper left",
+                bbox_to_anchor=(0.0, 1.30),
                 frameon=False,
+                ncol=len(data_lines),
                 columnspacing=1.0,
                 handletextpad=0.5,
+            )
+            ax_left.add_artist(legend_metrics)
+
+        if time_lines:
+            ax_left.legend(
+                time_lines,
+                time_labels,
+                loc="upper right",
+                bbox_to_anchor=(1.0, 1.30),
+                frameon=False,
+                ncol=len(time_lines),
+                columnspacing=1.0,
+                handletextpad=0.5,
+            )
+
+        # Plot the object rectangles above the figure
+        object_segments = self._get_object_segments()
+        transform = transforms.blended_transform_factory(
+            ax_left.transData, ax_left.transAxes
+        )
+
+        rect_y = 1.02  # just above the top of the axes (y = 1)
+        rect_h = 0.08  # height in axes fraction
+
+        for start, end, name in object_segments:
+            rect = Rectangle(
+                (start, rect_y),
+                width=(end - start),
+                height=rect_h,
+                transform=transform,
+                facecolor="white",
+                edgecolor="black",
+                linewidth=1.2,
+                zorder=10,
+                clip_on=False,
+            )
+            ax_left.add_patch(rect)
+
+            ax_left.text(
+                (start + end) / 2,
+                rect_y + rect_h / 2,
+                name,
+                transform=transform,
+                ha="center",
+                va="center",
+                fontsize=10,
+                color="black",
+                zorder=11,
+                clip_on=False,
             )
 
         fig.tight_layout(rect=[0, 0, 1, 0.90])
