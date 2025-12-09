@@ -34,6 +34,7 @@ from vedo import (
     Text2D,
 )
 
+from tbp.interactive.animator import WidgetAction, WidgetAnimator
 from tbp.interactive.colors import Palette
 from tbp.interactive.data import (
     DataLocator,
@@ -49,6 +50,7 @@ from tbp.interactive.utils import (
     CoordinateMapper,
     Location2D,
     Location3D,
+    make_slider_step_actions_for_widget,
     trace_hypothesis_backward,
     trace_hypothesis_forward,
 )
@@ -2969,7 +2971,9 @@ class InteractivePlot:
         self._widgets["topk_slider"].set_state(0)
 
         self.scope_viewer = ScopeViewer(self.plotter, self._widgets)
+        self.animator = self.create_animator()
         self.plotter.add_callback("KeyPress", self._on_keypress_quit)
+        self.plotter.add_callback("KeyPress", self._on_keypress_animate)
 
         self.plotter.at(0).show(
             camera=deepcopy(self.cam_dict),
@@ -3013,7 +3017,7 @@ class InteractivePlot:
             scopes=[1, 2, 3],
             bus=self.event_bus,
             scheduler=self.scheduler,
-            debounce_sec=0.5,
+            debounce_sec=0.1,
             dedupe=True,
         )
 
@@ -3147,10 +3151,46 @@ class InteractivePlot:
 
         return widgets
 
+    def create_animator(self):
+        step_slider = self._widgets["step_slider"]
+
+        max_step = 49
+
+        actions: list[WidgetAction] = []
+
+        step_actions = make_slider_step_actions_for_widget(
+            widget=step_slider,
+            start_value=0,
+            stop_value=max_step,
+            num_steps=max_step + 1,
+            step_dt=0.5,
+        )
+        actions.extend(step_actions)
+
+        return WidgetAnimator(
+            plotter=self.plotter,
+            actions=actions,
+            timer_dt_ms=50,
+        )
+
     def _on_keypress_quit(self, event):
         key = getattr(event, "keypress", None)
         if key is not None and key.lower() == "q":
             self.plotter.interactor.ExitCallback()
+
+    def _on_keypress_animate(self, event):
+        key = getattr(event, "keypress", None)
+        renderer = getattr(event, "at", None)
+        if (
+            (key is not None)
+            and (hasattr(self, "animator"))
+            and (renderer is not None)
+            and (renderer == 0)
+        ):
+            if key == "a":
+                self.animator.start()
+            elif key == "s":
+                self.animator.stop()
 
 
 @register(
