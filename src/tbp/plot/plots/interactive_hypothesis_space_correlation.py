@@ -22,7 +22,17 @@ import seaborn as sns
 import vedo
 from pandas import DataFrame, Series
 from pubsub.core import Publisher
-from vedo import Button, Circle, Image, Line, Mesh, Plotter, Slider2D, Sphere, Text2D
+from vedo import (
+    Button,
+    Circle,
+    Image,
+    Line,
+    Mesh,
+    Plotter,
+    Slider2D,
+    Sphere,
+    Text2D,
+)
 
 from tbp.interactive.colors import Palette
 from tbp.interactive.data import (
@@ -62,6 +72,7 @@ HUE_PALETTE = {
     "Primary": Palette.as_hex("numenta_blue"),
     "Secondary": Palette.as_hex("vivid_violet"),
     "Accent": Palette.as_hex("charcoal"),
+    "Accent2": Palette.as_hex("link_water"),
 }
 
 FONT = "Arial"
@@ -628,12 +639,12 @@ class GtMeshWidgetOps:
         ):
             future_pts = agent_positions[curr_idx + 1 :]
             for p in future_pts:
-                s = Sphere(pos=p, r=0.002, c=HUE_PALETTE["Secondary"])
+                s = Sphere(pos=p, r=0.002, c=Palette.as_hex("blue_violet"))
                 self.plotter.at(1).add(s)
                 self.agent_future_spheres.append(s)
             if len(future_pts) >= 2:
                 self.agent_future_line = Line(
-                    future_pts, c=HUE_PALETTE["Secondary"], lw=1
+                    future_pts, c=Palette.as_hex("blue_violet"), lw=1
                 )
                 self.plotter.at(1).add(self.agent_future_line)
 
@@ -672,12 +683,12 @@ class GtMeshWidgetOps:
         ):
             future_pts = patch_positions[curr_idx + 1 :]
             for p in future_pts:
-                s = Sphere(pos=p, r=0.002, c=Palette.as_hex("rich_black"))
+                s = Sphere(pos=p, r=0.002, c=HUE_PALETTE["Accent2"])
                 self.plotter.at(1).add(s)
                 self.patch_future_spheres.append(s)
             if len(future_pts) >= 2:
                 self.patch_future_line = Line(
-                    future_pts, c=Palette.as_hex("rich_black"), lw=1
+                    future_pts, c=HUE_PALETTE["Accent2"], lw=1
                 )
                 self.plotter.at(1).add(self.patch_future_line)
 
@@ -2232,7 +2243,7 @@ class HypothesisMeshWidgetOps:
 
         spheres_list = self.past_path_spheres if past else self.future_path_spheres
         line_attr = "past_path_line" if past else "future_path_line"
-        color = HUE_PALETTE["Primary"]
+        color = HUE_PALETTE["Primary"] if past else HUE_PALETTE["Accent2"]
 
         for p in points:
             s = Sphere(pos=p, r=0.002, c=color)
