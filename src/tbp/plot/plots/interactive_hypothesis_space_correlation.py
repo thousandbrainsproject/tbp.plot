@@ -2981,8 +2981,7 @@ class InteractivePlot:
 
         self.scope_viewer = ScopeViewer(self.plotter, self._widgets)
         self.animator = self.create_animator()
-        self.plotter.add_callback("KeyPress", self._on_keypress_quit)
-        self.plotter.add_callback("KeyPress", self._on_keypress_animate)
+        self.plotter.add_callback("KeyPress", self._on_keypress)
 
         self.plotter.at(0).show(
             camera=deepcopy(self.cam_dict),
@@ -3182,24 +3181,21 @@ class InteractivePlot:
             timer_dt_ms=50,
         )
 
-    def _on_keypress_quit(self, event):
+    def _on_keypress(self, event):
         key = getattr(event, "keypress", None)
-        if key is not None and key.lower() == "q":
-            self.plotter.interactor.ExitCallback()
+        if key is None:
+            return
 
-    def _on_keypress_animate(self, event):
-        key = getattr(event, "keypress", None)
-        renderer = getattr(event, "at", None)
-        if (
-            (key is not None)
-            and (hasattr(self, "animator"))
-            and (renderer is not None)
-            and (renderer == 0)
-        ):
+        if key.lower() == "q":
+            self.plotter.interactor.ExitCallback()
+            return
+
+        if hasattr(self, "animator") and event.at == 0:
             if key == "a":
                 self.animator.start()
             elif key == "s":
                 self.animator.stop()
+            return
 
 
 @register(
