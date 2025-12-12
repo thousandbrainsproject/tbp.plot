@@ -1706,30 +1706,35 @@ class CorrelationPlotWidgetOps:
         )
         return df.loc[distances.idxmin()]
 
-    def add_info_text(self) -> None:
+    def add_info_text(self, obj) -> None:
         """Summarize hypotheses statistics from a dataframe and add to plot."""
         if self.info_widget is not None:
             self.plotter.at(0).remove(self.info_widget)
 
         if self.df.empty:
-            return
+            text = (
+                f"Object: {obj}\n"
+                f"Total Existing Hypotheses: 0\n"
+                f"Added Hypotheses: 0\n"
+                f"Removed Hypotheses: 0"
+            )
+        else:
+            # Assume all rows share the same object name
+            graph_id = self.df["graph_id"].iloc[0]
 
-        # Assume all rows share the same object name
-        graph_id = self.df["graph_id"].iloc[0]
+            # Count per kind
+            kind_counts = self.df["kind"].value_counts()
 
-        # Count per kind
-        kind_counts = self.df["kind"].value_counts()
+            added = kind_counts.get("Added", 0)
+            removed = kind_counts.get("Removed", 0)
+            total = len(self.df) - removed
 
-        added = kind_counts.get("Added", 0)
-        removed = kind_counts.get("Removed", 0)
-        total = len(self.df) - removed
-
-        text = (
-            f"Object: {graph_id}\n"
-            f"Total Existing Hypotheses: {total}\n"
-            f"Added Hypotheses: {added}\n"
-            f"Removed Hypotheses: {removed}"
-        )
+            text = (
+                f"Object: {graph_id}\n"
+                f"Total Existing Hypotheses: {total}\n"
+                f"Added Hypotheses: {added}\n"
+                f"Removed Hypotheses: {removed}"
+            )
 
         self.info_widget = Text2D(txt=text, pos="top-left", font=FONT)
         self.plotter.at(0).add(self.info_widget)
@@ -1820,7 +1825,7 @@ class CorrelationPlotWidgetOps:
         widget = self.add_correlation_figure()
 
         # Add info text to scene
-        self.add_info_text()
+        self.add_info_text(obj=msgs_dict["current_object"])
 
         # Add mlh circle to scene
         self.add_mlh_circles(msgs_dict["top_k"])
