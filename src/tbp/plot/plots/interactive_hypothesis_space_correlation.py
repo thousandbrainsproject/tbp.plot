@@ -2845,7 +2845,7 @@ class HypothesisLifespanWidgetOps:
         if lines:
             ax1.legend(lines, labels, loc="best", frameon=True)
 
-        ax1.set_title("Hypothesis Lifespan")
+        ax1.set_title("Hypothesis Evidence Accumulation\nand Growth Over Time")
         fig.tight_layout()
 
         widget = Image(fig)
