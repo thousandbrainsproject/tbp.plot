@@ -1673,7 +1673,7 @@ class CorrelationPlotWidgetOps:
 
         g.ax_joint.set_xlim(-2.0, 2.0)
         g.ax_joint.set_ylim(0, 3.25)
-        g.ax_joint.set_xlabel(x, labelpad=10)
+        g.ax_joint.set_xlabel("Recent Evidence Growth", labelpad=10)
         g.ax_joint.set_ylabel(y, labelpad=10)
         g.figure.tight_layout()
 
@@ -2797,7 +2797,7 @@ class HypothesisLifespanWidgetOps:
             color=HUE_PALETTE["Secondary"],
             label="Evidence Slope",
         )
-        ax2.set_ylabel("Evidence Slope")
+        ax2.set_ylabel("Recent Evidence Growth")
 
         # Setting ticks on x-axis
         x_min, x_max = df["x"].min(), df["x"].max()
@@ -2824,12 +2824,16 @@ class HypothesisLifespanWidgetOps:
         ax1.axvline(x=x_current, linestyle="--", linewidth=1.0, color="0.2")
 
         # Legend for both axes
+        label_renames = {
+            "Evidence": "Evidence",
+            "Evidence Slope": "Recent Evidence Growth",
+        }
         lines, labels = [], []
         for ax in (ax1, ax2):
             line, label = ax.get_legend_handles_labels()
             if line:
-                lines += line
-                labels += label
+                lines.append(line[0])
+                labels.append(label_renames.get(label[0], label))
                 ax.legend_.remove()
         if lines:
             ax1.legend(lines, labels, loc="best", frameon=True)
@@ -2848,7 +2852,7 @@ class HypothesisLifespanWidgetOps:
         info = (
             f"Age: {hyp['age']}\n"
             + f"Evidence: {hyp['Evidence']:.2f}\n"
-            + f"Evidence Slope: {hyp['Evidence Slope']:.2f}\n"
+            + f"Recent Evidence Growth: {hyp['Evidence Slope']:.2f}\n"
             + f"Pose Error: {hyp['Pose Error']:.2f}"
         )
         self.info_widget = Text2D(txt=info, pos="top-right", font=FONT)
