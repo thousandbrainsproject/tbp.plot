@@ -1288,13 +1288,19 @@ class LinePlotWidgetOps:
         time_lines: list[Line2D] = []
         time_labels: list[str] = []
 
+        label_renames = {
+            "Max slope": "Max Recent Evidence Growth",
+            "Hypothesis space size": "Hypothesis Space Size",
+            "Burst": "Sampling Burst",
+            "Current step": "Current Step",
+        }
         for line, label in zip(all_lines, all_labels, strict=True):
             if label in ("Max slope", "Hypothesis space size"):
                 data_lines.append(line)
-                data_labels.append(label)
+                data_labels.append(label_renames.get(label, label))
             elif label in ("Burst", "Current step"):
                 time_lines.append(line)
-                time_labels.append(label)
+                time_labels.append(label_renames.get(label, label))
 
         if data_lines:
             legend_metrics = ax_left.legend(

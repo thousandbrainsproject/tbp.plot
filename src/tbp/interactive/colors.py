@@ -50,7 +50,6 @@ class Palette:
     charcoal: str = "#3f3f3f"
     link_water: str = "#dfe6f5"
 
-    # ---------- Internal helper ----------
     @classmethod
     def _validate(cls, name: str) -> str:
         if not hasattr(cls, name):
@@ -62,7 +61,6 @@ class Palette:
             raise KeyError(msg)
         return getattr(cls, name)
 
-    # ---------- Public API ----------
     @classmethod
     def as_hex(cls, name: str) -> Color:
         """Return the raw hex string for a color name."""

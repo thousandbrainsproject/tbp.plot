@@ -968,7 +968,7 @@ class TopKSliderWidgetOps:
     def set_state(self, widget: Slider2D, value: int) -> None:
         set_slider_state(widget, value)
 
-    def state_to_messages(self, state: float) -> Iterable[TopicMessage]:
+    def state_to_messages(self, state: int) -> Iterable[TopicMessage]:
         return [TopicMessage(name="top_k", value=state)]
 
 
@@ -1398,7 +1398,7 @@ class CorrelationPlotWidgetOps:
         Returns:
             A tuple `(prev_episode, prev_step)`.
         """
-        # Base case: already at earliest step
+        # Already at earliest step
         if episode == 0 and step == 0:
             return 0, 0
 
@@ -1406,7 +1406,7 @@ class CorrelationPlotWidgetOps:
         if step > 0:
             return episode, step - 1
 
-        # step == 0 → need to go to previous episode
+        # If step is 0, we need to go to previous episode
         prev_episode = episode - 1
 
         # Find last step index in previous episode
@@ -1675,7 +1675,7 @@ class CorrelationPlotWidgetOps:
 
         g.ax_joint.set_xlim(-2.0, 2.0)
         g.ax_joint.set_ylim(0, 3.25)
-        g.ax_joint.set_xlabel(x, labelpad=10)
+        g.ax_joint.set_xlabel("Recent Evidence Growth", labelpad=10)
         g.ax_joint.set_ylabel(y, labelpad=10)
         g.figure.tight_layout()
 
@@ -1708,30 +1708,35 @@ class CorrelationPlotWidgetOps:
         )
         return df.loc[distances.idxmin()]
 
-    def add_info_text(self) -> None:
+    def add_info_text(self, obj) -> None:
         """Summarize hypotheses statistics from a dataframe and add to plot."""
         if self.info_widget is not None:
             self.plotter.at(0).remove(self.info_widget)
 
         if self.df.empty:
-            return
+            text = (
+                f"Object: {obj}\n"
+                f"Total Existing Hypotheses: 0\n"
+                f"Added Hypotheses: 0\n"
+                f"Removed Hypotheses: 0"
+            )
+        else:
+            # Assume all rows share the same object name
+            graph_id = self.df["graph_id"].iloc[0]
 
-        # Assume all rows share the same object name
-        graph_id = self.df["graph_id"].iloc[0]
+            # Count per kind
+            kind_counts = self.df["kind"].value_counts()
 
-        # Count per kind
-        kind_counts = self.df["kind"].value_counts()
+            added = kind_counts.get("Added", 0)
+            removed = kind_counts.get("Removed", 0)
+            total = len(self.df) - removed
 
-        added = kind_counts.get("Added", 0)
-        removed = kind_counts.get("Removed", 0)
-        total = len(self.df) - removed
-
-        text = (
-            f"Object: {graph_id}\n"
-            f"Total Existing Hypotheses: {total}\n"
-            f"Added Hypotheses: {added}\n"
-            f"Removed Hypotheses: {removed}"
-        )
+            text = (
+                f"Object: {graph_id}\n"
+                f"Total Existing Hypotheses: {total}\n"
+                f"Added Hypotheses: {added}\n"
+                f"Removed Hypotheses: {removed}"
+            )
 
         self.info_widget = Text2D(txt=text, pos="top-left", font=FONT)
         self.plotter.at(0).add(self.info_widget)
@@ -1822,7 +1827,7 @@ class CorrelationPlotWidgetOps:
         widget = self.add_correlation_figure()
 
         # Add info text to scene
-        self.add_info_text()
+        self.add_info_text(obj=msgs_dict["current_object"])
 
         # Add mlh circle to scene
         self.add_mlh_circles(msgs_dict["top_k"])
@@ -2799,7 +2804,7 @@ class HypothesisLifespanWidgetOps:
             color=HUE_PALETTE["Secondary"],
             label="Evidence Slope",
         )
-        ax2.set_ylabel("Evidence Slope")
+        ax2.set_ylabel("Recent Evidence Growth")
 
         # Setting ticks on x-axis
         x_min, x_max = df["x"].min(), df["x"].max()
@@ -2826,12 +2831,16 @@ class HypothesisLifespanWidgetOps:
         ax1.axvline(x=x_current, linestyle="--", linewidth=1.0, color="0.2")
 
         # Legend for both axes
+        label_renames = {
+            "Evidence": "Evidence",
+            "Evidence Slope": "Recent Evidence Growth",
+        }
         lines, labels = [], []
         for ax in (ax1, ax2):
             line, label = ax.get_legend_handles_labels()
             if line:
-                lines += line
-                labels += label
+                lines.append(line[0])
+                labels.append(label_renames.get(label[0], label))
                 ax.legend_.remove()
         if lines:
             ax1.legend(lines, labels, loc="best", frameon=True)
@@ -2850,7 +2859,7 @@ class HypothesisLifespanWidgetOps:
         info = (
             f"Age: {hyp['age']}\n"
             + f"Evidence: {hyp['Evidence']:.2f}\n"
-            + f"Evidence Slope: {hyp['Evidence Slope']:.2f}\n"
+            + f"Recent Evidence Growth: {hyp['Evidence Slope']:.2f}\n"
             + f"Pose Error: {hyp['Pose Error']:.2f}"
         )
         self.info_widget = Text2D(txt=info, pos="top-right", font=FONT)

@@ -22,12 +22,12 @@ class ScopeViewer:
 
     Behavior summary:
     - Scope 0:
-        * If at least one widget is hidden -> show ALL widgets.
+        * If at least one widget is hidden -> show all widgets.
         * Else (all visible) -> hide ALL widgets.
     - Scope k (1..9):
         * Toggle that scope on/off.
-        * A widget is visible if ANY active scope includes it.
-        * If no active scopes -> all widgets off.
+        * During a toggle off, a widget may remain visible if any other active scope
+            includes it.
 
     The widgets themselves decide how to hide/show internally using
     their .on() / .off() visibility handlers.
