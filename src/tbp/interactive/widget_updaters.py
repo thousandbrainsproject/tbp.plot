@@ -90,7 +90,7 @@ class WidgetUpdater[WidgetT]:
     def expire_topic(self, topic_name: str) -> None:
         """Expire (remove) the stored message for a given topic.
 
-        After expiration, the updater will require a new message for that topic
+        After expiration, the updater may require a new message for that topic
         before becoming ready again.
 
         Args:

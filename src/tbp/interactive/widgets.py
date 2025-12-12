@@ -211,8 +211,6 @@ class Widget[WidgetT, StateT]:
             if isinstance(e, EventSpec)
         }
 
-        return {t.name for u in self.widget_ops.updaters for t in u.topics}
-
     def add(self) -> None:
         """Create the widget and register the debounce callback.
 
