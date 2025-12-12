@@ -966,7 +966,7 @@ class TopKSliderWidgetOps:
     def set_state(self, widget: Slider2D, value: int) -> None:
         set_slider_state(widget, value)
 
-    def state_to_messages(self, state: float) -> Iterable[TopicMessage]:
+    def state_to_messages(self, state: int) -> Iterable[TopicMessage]:
         return [TopicMessage(name="top_k", value=state)]
 
 
@@ -1396,7 +1396,7 @@ class CorrelationPlotWidgetOps:
         Returns:
             A tuple `(prev_episode, prev_step)`.
         """
-        # Base case: already at earliest step
+        # Already at earliest step
         if episode == 0 and step == 0:
             return 0, 0
 
@@ -1404,7 +1404,7 @@ class CorrelationPlotWidgetOps:
         if step > 0:
             return episode, step - 1
 
-        # step == 0 → need to go to previous episode
+        # If step is 0, we need to go to previous episode
         prev_episode = episode - 1
 
         # Find last step index in previous episode
@@ -2843,7 +2843,7 @@ class HypothesisLifespanWidgetOps:
         if lines:
             ax1.legend(lines, labels, loc="best", frameon=True)
 
-        ax1.set_title("Hypothesis Lifespan")
+        ax1.set_title("Hypothesis Evidence Accumulation\nand Growth Over Time")
         fig.tight_layout()
 
         widget = Image(fig)
