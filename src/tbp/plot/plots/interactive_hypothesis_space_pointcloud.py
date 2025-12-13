@@ -1036,9 +1036,9 @@ class LinePlotWidgetOps:
     """WidgetOps implementation for the line plot.
 
     This widget shows a line plot for the max global slope and hypothesis space size
-    over time. It also shows the sampling bursts locations as vertical dashed red lines.
-    The current step is shown as a vertical solid black line and moves with the step
-    slider control.
+    over time. It also shows the sampling bursts locations as vertical dashed violet
+    lines. The current step is shown as a vertical solid black line and moves with the
+    step slider control.
     """
 
     def __init__(
@@ -1242,7 +1242,7 @@ class LinePlotWidgetOps:
         ax_left.set_ylim(-1.0, 2.0)
         ax_right.set_ylim(0, 10000)
 
-        # Burst locations (red dashed lines)
+        # Burst locations (violet dashed lines)
         add_idx = np.flatnonzero(bursts)
         if add_idx.size > 0:
             ymin, ymax = ax_left.get_ylim()
@@ -1272,7 +1272,7 @@ class LinePlotWidgetOps:
                 label="Current step",
             )
 
-        ax_left.set_ylabel("Max slope")
+        ax_left.set_ylabel("Max Recent Evidence Growth")
         ax_right.set_ylabel("Hyp space size")
 
         # Collect legend entries
@@ -1466,8 +1466,8 @@ class InteractivePlot:
     - Buttons to activate or deactivate the history of agent and/or patch locations.
     - A plot of the pretrained model for the primary target with a button to show the
         hypothesis space for this object.
-    - The hypothesis space pointcloud can be coloured by different metrics, such as
-        evidence, mlh, slope, pose error or age.
+    - The color-map of the hypothesis space pointcloud can reflect different metric
+        values, such as evidence, mlh, slope, pose error or age.
     - A line plot showing the maximum global slope (burst trigger), the
         location/duration of the sampling bursts and the hypothesis space size over
         time.
