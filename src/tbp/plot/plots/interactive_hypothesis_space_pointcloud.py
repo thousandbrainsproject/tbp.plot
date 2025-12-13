@@ -225,7 +225,7 @@ class StepSliderWidgetOps:
         }
 
         self.step_mapper = step_mapper
-        self.current_episode = -1
+        self.current_episode: int | None = None
 
     def add(self, callback: Callable) -> Slider2D:
         kwargs = deepcopy(self._add_kwargs)
