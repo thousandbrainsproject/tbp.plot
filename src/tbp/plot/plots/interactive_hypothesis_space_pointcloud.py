@@ -24,6 +24,7 @@ from matplotlib.patches import Rectangle
 from pubsub.core import Publisher
 from vedo import Button, Image, Line, Mesh, Plotter, Points, Slider2D, Sphere
 
+from tbp.interactive.animator import WidgetAnimator, make_slider_step_actions_for_widget
 from tbp.interactive.colors import Palette
 from tbp.interactive.data import (
     DataLocator,
@@ -1517,6 +1518,7 @@ class InteractivePlot:
         self.event_bus = Publisher()
         self.plotter = Plotter(shape=renderer_areas, sharecam=False).render()
         self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=33)
+        self.animator = None
 
         # create and add the widgets to the plotter
         self._widgets = self.create_widgets()
@@ -1530,7 +1532,7 @@ class InteractivePlot:
         self._widgets["hyp_color_button"].set_state("None")
         self._widgets["hyp_scope_button"].set_state("Hypotheses: Off")
 
-        self.plotter.add_callback("KeyPress", self._on_keypress_quit)
+        self.plotter.add_callback("KeyPress", self._on_keypress)
 
         self.plotter.at(0).show(
             camera=deepcopy(self.cam_dict),
@@ -1675,10 +1677,46 @@ class InteractivePlot:
 
         return widgets
 
-    def _on_keypress_quit(self, event):
+    def create_step_animator(self):
+        step_slider = self._widgets["step_slider"]
+        slider_current_value = step_slider.widget_ops.extract_state(
+            widget=step_slider.widget
+        )
+        slider_max_value = int(step_slider.widget.range[1])
+
+        step_actions = make_slider_step_actions_for_widget(
+            widget=step_slider,
+            start_value=slider_current_value,
+            stop_value=slider_max_value,
+            num_steps=slider_max_value - slider_current_value + 1,
+            step_dt=0.5,
+        )
+
+        return WidgetAnimator(
+            scheduler=self.scheduler,
+            actions=step_actions,
+            key_prefix="step_animator",
+        )
+
+    def _on_keypress(self, event):
         key = getattr(event, "keypress", None)
-        if key is not None and key.lower() == "q":
+        if key is None:
+            return
+
+        if key.lower() == "q":
             self.plotter.interactor.ExitCallback()
+            return
+
+        if hasattr(self, "animator") and event.at == 0:
+            if key == "a":
+                if self.animator is not None:
+                    self.animator.stop()
+
+                self.animator = self.create_step_animator()
+                self.animator.start()
+            elif key == "s":
+                if self.animator is not None:
+                    self.animator.stop()
 
 
 @register(

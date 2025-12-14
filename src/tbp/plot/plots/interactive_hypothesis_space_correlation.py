@@ -34,7 +34,10 @@ from vedo import (
     Text2D,
 )
 
-from tbp.interactive.animator import WidgetAction, WidgetAnimator
+from tbp.interactive.animator import (
+    WidgetAnimator,
+    make_slider_step_actions_for_widget,
+)
 from tbp.interactive.colors import Palette
 from tbp.interactive.data import (
     DataLocator,
@@ -50,7 +53,6 @@ from tbp.interactive.utils import (
     CoordinateMapper,
     Location2D,
     Location3D,
-    make_slider_step_actions_for_widget,
     trace_hypothesis_backward,
     trace_hypothesis_forward,
 )
@@ -2970,6 +2972,7 @@ class InteractivePlot:
         self.event_bus = Publisher()
         self.plotter = Plotter(shape=renderer_areas, sharecam=False).render()
         self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=33)
+        self.animator = None
 
         # create and add the widgets to the plotter
         self._widgets = self.create_widgets()
@@ -2980,7 +2983,6 @@ class InteractivePlot:
         self._widgets["topk_slider"].set_state(0)
 
         self.scope_viewer = ScopeViewer(self.plotter, self._widgets)
-        self.animator = self.create_animator()
         self.plotter.add_callback("KeyPress", self._on_keypress)
 
         self.plotter.at(0).show(
@@ -3159,26 +3161,25 @@ class InteractivePlot:
 
         return widgets
 
-    def create_animator(self):
+    def create_step_animator(self):
         step_slider = self._widgets["step_slider"]
-
-        max_step = 49
-
-        actions: list[WidgetAction] = []
+        slider_current_value = step_slider.widget_ops.extract_state(
+            widget=step_slider.widget
+        )
+        slider_max_value = int(step_slider.widget.range[1])
 
         step_actions = make_slider_step_actions_for_widget(
             widget=step_slider,
-            start_value=0,
-            stop_value=max_step,
-            num_steps=max_step + 1,
+            start_value=slider_current_value,
+            stop_value=slider_max_value,
+            num_steps=slider_max_value - slider_current_value + 1,
             step_dt=0.5,
         )
-        actions.extend(step_actions)
 
         return WidgetAnimator(
-            plotter=self.plotter,
-            actions=actions,
-            timer_dt_ms=50,
+            scheduler=self.scheduler,
+            actions=step_actions,
+            key_prefix="step_animator",
         )
 
     def _on_keypress(self, event):
@@ -3192,10 +3193,14 @@ class InteractivePlot:
 
         if hasattr(self, "animator") and event.at == 0:
             if key == "a":
+                if self.animator is not None:
+                    self.animator.stop()
+
+                self.animator = self.create_step_animator()
                 self.animator.start()
             elif key == "s":
-                self.animator.stop()
-            return
+                if self.animator is not None:
+                    self.animator.stop()
 
 
 @register(
