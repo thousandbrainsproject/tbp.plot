@@ -19,8 +19,6 @@ import numpy as np
 import numpy.typing as npt
 from vedo.vtkclasses import vtkRenderWindowInteractor
 
-from tbp.interactive.animator import WidgetAction
-
 if TYPE_CHECKING:
     from collections.abc import Callable, Hashable, Iterable
 
@@ -382,54 +380,3 @@ def trace_hypothesis_forward(ix: int, removed_ids: Iterable[int]) -> int | None:
     if pos < len(removed_ids) and removed_ids[pos] == ix:
         return None
     return ix - pos
-
-
-def make_slider_step_actions_for_widget(
-    *,
-    widget,
-    start_value: float,
-    stop_value: float,
-    num_steps: int,
-    step_dt: float,
-) -> list[WidgetAction]:
-    """Generate time-scheduled slider step actions for a widget.
-
-    This helper creates a sequence of `WidgetAction` objects that gradually set
-    the state of the given widget from `start_value` to `stop_value` in uniform
-    increments. Each action is scheduled at a fixed time offset, forming a smooth,
-    evenly paced animation when executed by a `WidgetAnimator`.
-
-    Args:
-        widget: The widget whose `.set_state()` method will be invoked at each step.
-        start_value: Initial slider value at time zero.
-        stop_value: Final slider value at the last step.
-        num_steps: Number of interpolation steps, including both endpoints.
-            Must be >= 2. The slider values will be linearly spaced across these steps.
-        step_dt: Time interval in seconds between consecutive actions.
-
-    Returns:
-        list[WidgetAction]: A list of actions, sorted by increasing time, where each
-        action updates the widget's state to a specific intermediate value.
-
-    Raises:
-        ValueError: If `num_steps` is less than 2.
-
-    """
-    if num_steps < 2:
-        raise ValueError("num_steps must be >= 2")
-
-    delta = (stop_value - start_value) / (num_steps - 1)
-    actions: list[WidgetAction] = []
-
-    for i in range(num_steps):
-        t = i * step_dt
-        value = start_value + i * delta
-
-        actions.append(
-            WidgetAction(
-                time=t,
-                func=lambda val=value, w=widget: w.set_state(val),
-            )
-        )
-
-    return actions

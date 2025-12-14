@@ -7,9 +7,10 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT.
 
-import time
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 from dataclasses import dataclass
+
+from tbp.interactive.utils import VtkDebounceScheduler
 
 
 @dataclass
@@ -35,97 +36,118 @@ class WidgetAction:
 
 
 class WidgetAnimator:
-    """Animate widget state changes over time using a VTK/vedo timer.
+    """Animate widget state changes using an existing VTK debounce scheduler.
 
-    `WidgetAnimator` schedules and executes a sequence of `WidgetAction` objects
-    during an interactive vedo session. Each action is invoked at a precise time
-    offset relative to when the animation starts, allowing the visualization to
-    behave as if a user were manually interacting with widgets (e.g., sliders,
-    buttons) in a smooth, time-controlled manner. The animator uses a repeating
-    VTK timer to poll elapsed time and trigger pending actions.
+    This class drives scripted widget interactions by scheduling `WidgetAction`
+    callables through a shared `VtkDebounceScheduler`. Each action is executed
+    once at a specified time offset, allowing the visualization to behave as if
+    a user were manually interacting with widgets (e.g., sliders or buttons)
+    in a smooth, reproducible manner.
 
     Args:
-        plotter: The `vedo.Plotter` instance whose interactor will host the timer
-            callback. This is typically the main plotter used in an
-            `InteractivePlot`.
-        actions: A sequence of scheduled actions sorted by time. If unsorted,
-            the constructor will sort them by `action.time`. Each action's `func`
-            is invoked when its scheduled time is reached.
-        timer_dt_ms: Interval in milliseconds at which the timer callback is
-            invoked. Defaults to 50 ms (20 Hz).
+        scheduler: A `VtkDebounceScheduler` instance used to schedule animation
+            callbacks within the VTK event loop.
+        actions: A sequence of time-stamped actions to execute. Actions are sorted
+            by their `time` attribute before scheduling.
+        key_prefix: Prefix used to construct unique keys for scheduled callbacks
+            in the scheduler. Defaults to `"widget_animator"`.
 
     Attributes:
-        plotter: The vedo plotter associated with this animator.
+        scheduler: The debounce scheduler used to schedule animation callbacks.
         actions: The sorted list of scheduled actions.
-        timer_dt_ms: Timer interval in milliseconds.
-        timer_id: The VTK timer ID returned by the plotter when the timer is created.
-            Used for destroying the timer later.
-        _start_time: The absolute time (in seconds) at which the animation started.
-        _next_idx: Index of the next action to execute.
-        _running: Whether the animation is currently active.
-
+        key_prefix: Prefix used when generating scheduler keys.
+        _running: Whether the animator is currently active.
     """
 
     def __init__(
         self,
-        plotter,
+        scheduler: VtkDebounceScheduler,
         actions: list[WidgetAction],
-        timer_dt_ms: int = 50,
+        key_prefix: Hashable = "widget_animator",
     ) -> None:
-        self.plotter = plotter
+        self.scheduler = scheduler
         self.actions = sorted(actions, key=lambda a: a.time)
-        self.timer_dt_ms = timer_dt_ms
+        self.key_prefix = key_prefix
 
-        self.timer_id: int | None = None
-        self._start_time: float | None = None
-        self._next_idx: int = 0
         self._running: bool = False
 
     def start(self) -> None:
-        """Start the animation."""
+        """Start the animation by scheduling all actions.
+
+        Each `WidgetAction` is registered with the scheduler and scheduled to
+        execute once at its specified time offset.
+        """
         if not self.actions:
             return
 
-        self._start_time = time.perf_counter()
-        self._next_idx = 0
+        for idx, action in enumerate(self.actions):
+            key = (self.key_prefix, idx)
+            self.scheduler.register(
+                key,
+                lambda i=idx, self=self: self._running and self.actions[i].func(),
+            )
+            self.scheduler.schedule_once(key, delay_sec=action.time)
+
         self._running = True
 
-        # Register timer callback only once.
-        self.plotter.add_callback("timer", self._on_timer)
-
-        # Create a repeating timer if not already created.
-        if self.timer_id is None:
-            self.timer_id = self.plotter.timer_callback(
-                "create",
-                dt=self.timer_dt_ms,
-            )
-
     def stop(self) -> None:
-        """Stop the animation and destroy the timer."""
+        """Stop the animation and cancel all scheduled actions.
+
+        This method prevents any pending actions from executing and removes
+        all associated callbacks from the scheduler.
+        """
         if not self._running:
             return
+
+        for idx in range(len(self.actions)):
+            key = (self.key_prefix, idx)
+            self.scheduler.cancel(key)
+
         self._running = False
 
-        if self.timer_id is not None:
-            self.plotter.timer_callback("destroy", timer_id=self.timer_id)
-            self.timer_id = None
 
-    def _on_timer(self, evt) -> None:
-        """Timer callback invoked by vedo."""
-        if not self._running or self._start_time is None:
-            return
+def make_slider_step_actions_for_widget(
+    *,
+    widget,
+    start_value: float,
+    stop_value: float,
+    num_steps: int,
+    step_dt: float,
+) -> list[WidgetAction]:
+    """Generate time-scheduled slider step actions for a widget.
 
-        current_time = time.perf_counter() - self._start_time
+    This helper creates a sequence of `WidgetAction` objects that gradually set
+    the state of the given widget from `start_value` to `stop_value` in uniform
+    increments. Each action is scheduled at a fixed time offset, forming a smooth,
+    evenly paced animation when executed by a `WidgetAnimator`.
 
-        # Execute all actions whose scheduled time has passed.
-        while (
-            self._next_idx < len(self.actions)
-            and current_time >= self.actions[self._next_idx].time
-        ):
-            action = self.actions[self._next_idx]
-            action.func()
-            self._next_idx += 1
+    Args:
+        widget: The widget whose `.set_state()` method will be invoked at each step.
+        start_value: Initial slider value at time zero.
+        stop_value: Final slider value at the last step.
+        num_steps: Number of interpolation steps, including both endpoints.
+            Must be >= 2. The slider values will be linearly spaced across these steps.
+        step_dt: Time interval in seconds between consecutive actions.
 
-        # Stop when done.
-        if self._next_idx >= len(self.actions):
-            self.stop()
+    Returns:
+        list[WidgetAction]: A list of actions, sorted by increasing time, where each
+        action updates the widget's state to a specific intermediate value.
+    """
+    if num_steps < 2:
+        return []
+
+    delta = (stop_value - start_value) / (num_steps - 1)
+    actions: list[WidgetAction] = []
+
+    for i in range(num_steps):
+        t = i * step_dt
+        value = start_value + i * delta
+
+        actions.append(
+            WidgetAction(
+                time=t,
+                func=lambda val=value, w=widget: w.set_state(val),
+            )
+        )
+
+    return actions
