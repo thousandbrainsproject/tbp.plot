@@ -2789,7 +2789,7 @@ class HypothesisLifespanWidgetOps:
             color=COLOR_PALETTE["Primary"],
             label="Evidence",
         )
-        ax1.set_xlabel("Episode / Step")
+        ax1.set_xlabel("Time")
         ax1.set_ylabel("Evidence")
 
         # Evidence slopes plot on right axis
@@ -2846,7 +2846,6 @@ class HypothesisLifespanWidgetOps:
         if lines:
             ax1.legend(lines, labels, loc="best", frameon=True)
 
-        ax1.set_title("Hypothesis Evidence Accumulation\nand Growth Over Time")
         fig.tight_layout()
 
         widget = Image(fig)
