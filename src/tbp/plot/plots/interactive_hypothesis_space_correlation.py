@@ -1993,7 +1993,7 @@ class HypothesisMeshWidgetOps:
             "evidence_slopes": updater_data["evidence_slopes"],
         }
 
-    def _extract_mod_ids(
+    def _extract_ids_at_step(
         self, episode: str, step: int, obj: str
     ) -> tuple[Iterable[int], Iterable[int]]:
         """Return added and removed hypothesis ids."""
@@ -2055,7 +2055,7 @@ class HypothesisMeshWidgetOps:
         rows_back: list[dict] = []
         episode_b, step_b, idx_b = episode, step, ix
         while True:
-            added_ids, removed_ids = self._extract_mod_ids(episode_b, step_b, obj)
+            added_ids, removed_ids = self._extract_ids_at_step(episode_b, step_b, obj)
             idx_prev = trace_hypothesis_backward(
                 idx_b, removed_ids=sorted(removed_ids), added_ids=sorted(added_ids)
             )
@@ -2086,7 +2086,7 @@ class HypothesisMeshWidgetOps:
             if episode_next is None or step_next is None:
                 break
 
-            _, removed_ids = self._extract_mod_ids(episode_next, step_next, obj)
+            _, removed_ids = self._extract_ids_at_step(episode_next, step_next, obj)
             idx_next = trace_hypothesis_forward(idx_f, removed_ids=sorted(removed_ids))
             if idx_next is None:
                 break
@@ -2562,7 +2562,7 @@ class HypothesisLifespanWidgetOps:
             "evidence_slopes": updater_data["evidence_slopes"],
         }
 
-    def _extract_mod_ids(
+    def _extract_ids_at_step(
         self, episode: str, step: int, obj: str
     ) -> tuple[Iterable[int], Iterable[int]]:
         """Returns the added and removed ids."""
@@ -2678,7 +2678,7 @@ class HypothesisLifespanWidgetOps:
         rows_back: list[dict] = []
         episode_b, step_b, idx_b = episode, step, ix
         while True:
-            added_ids, removed_ids = self._extract_mod_ids(episode_b, step_b, obj)
+            added_ids, removed_ids = self._extract_ids_at_step(episode_b, step_b, obj)
             idx_prev = trace_hypothesis_backward(
                 idx_b, removed_ids=sorted(removed_ids), added_ids=sorted(added_ids)
             )
@@ -2715,7 +2715,7 @@ class HypothesisLifespanWidgetOps:
             if episode_next is None or step_next is None:
                 break
 
-            _, removed_ids = self._extract_mod_ids(episode_next, step_next, obj)
+            _, removed_ids = self._extract_ids_at_step(episode_next, step_next, obj)
             idx_next = trace_hypothesis_forward(idx_f, removed_ids=sorted(removed_ids))
 
             # Hypothesis is deleted
