@@ -991,7 +991,7 @@ class HypColorButtonWidgetOps:
                 COLOR_PALETTE["Accent"],
                 COLOR_PALETTE["Primary"],
                 COLOR_PALETTE["Secondary"],
-                COLOR_PALETTE["pink"],
+                COLOR_PALETTE["Pink"],
                 COLOR_PALETTE["Gold"],
                 COLOR_PALETTE["Green"],
             ],
