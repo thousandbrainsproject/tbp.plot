@@ -69,14 +69,17 @@ logger = logging.getLogger(__name__)
 
 vedo.settings.enable_default_keyboard_callbacks = False
 
-HUE_PALETTE = {
+COLOR_PALETTE = {
     "Maintained": Palette.as_hex("numenta_blue"),
-    "Removed": Palette.as_hex("vivid_violet"),
-    "Added": Palette.as_hex("charcoal"),
+    "Removed": Palette.as_hex("gold"),
+    "Added": Palette.as_hex("purple"),
+    "Selected": Palette.as_hex("pink"),
+    "Highlighted": Palette.as_hex("green"),
     "Primary": Palette.as_hex("numenta_blue"),
-    "Secondary": Palette.as_hex("vivid_violet"),
+    "Secondary": Palette.as_hex("purple"),
     "Accent": Palette.as_hex("charcoal"),
     "Accent2": Palette.as_hex("link_water"),
+    "Accent3": Palette.as_hex("rich_black"),
 }
 
 FONT = "Arial"
@@ -563,7 +566,7 @@ class GtMeshWidgetOps:
             self.agent_sphere = Sphere(
                 pos=agent_pos,
                 r=0.004,
-                c=HUE_PALETTE["Secondary"],
+                c=COLOR_PALETTE["Secondary"],
             )
 
             self.plotter.at(1).add(self.agent_sphere)
@@ -571,7 +574,7 @@ class GtMeshWidgetOps:
 
         if self.gaze_line is None:
             self.gaze_line = Line(
-                agent_pos, patch_pos, c=Palette.as_hex("rich_black"), lw=4
+                agent_pos, patch_pos, c=COLOR_PALETTE["Accent3"], lw=4
             )
             self.plotter.at(1).add(self.gaze_line)
         self.gaze_line.points = [agent_pos, patch_pos]
@@ -629,11 +632,13 @@ class GtMeshWidgetOps:
         if self.show_agent_past and agent_positions:
             past_pts = agent_positions[: curr_idx + 1]
             for p in past_pts:
-                s = Sphere(pos=p, r=0.002, c=HUE_PALETTE["Secondary"])
+                s = Sphere(pos=p, r=0.002, c=COLOR_PALETTE["Secondary"])
                 self.plotter.at(1).add(s)
                 self.agent_past_spheres.append(s)
             if len(past_pts) >= 2:
-                self.agent_past_line = Line(past_pts, c=HUE_PALETTE["Secondary"], lw=1)
+                self.agent_past_line = Line(
+                    past_pts, c=COLOR_PALETTE["Secondary"], lw=1
+                )
                 self.plotter.at(1).add(self.agent_past_line)
 
         if (
@@ -643,12 +648,12 @@ class GtMeshWidgetOps:
         ):
             future_pts = agent_positions[curr_idx + 1 :]
             for p in future_pts:
-                s = Sphere(pos=p, r=0.002, c=Palette.as_hex("blue_violet"))
+                s = Sphere(pos=p, r=0.002, c=COLOR_PALETTE["Secondary"])
                 self.plotter.at(1).add(s)
                 self.agent_future_spheres.append(s)
             if len(future_pts) >= 2:
                 self.agent_future_line = Line(
-                    future_pts, c=Palette.as_hex("blue_violet"), lw=1
+                    future_pts, c=COLOR_PALETTE["Secondary"], lw=1
                 )
                 self.plotter.at(1).add(self.agent_future_line)
 
@@ -671,13 +676,11 @@ class GtMeshWidgetOps:
         if self.show_patch_past and patch_positions:
             past_pts = patch_positions[: curr_idx + 1]
             for p in past_pts:
-                s = Sphere(pos=p, r=0.002, c=Palette.as_hex("rich_black"))
+                s = Sphere(pos=p, r=0.002, c=COLOR_PALETTE["Accent3"])
                 self.plotter.at(1).add(s)
                 self.patch_past_spheres.append(s)
             if len(past_pts) >= 2:
-                self.patch_past_line = Line(
-                    past_pts, c=Palette.as_hex("rich_black"), lw=1
-                )
+                self.patch_past_line = Line(past_pts, c=COLOR_PALETTE["Accent3"], lw=1)
                 self.plotter.at(1).add(self.patch_past_line)
 
         if (
@@ -687,12 +690,12 @@ class GtMeshWidgetOps:
         ):
             future_pts = patch_positions[curr_idx + 1 :]
             for p in future_pts:
-                s = Sphere(pos=p, r=0.002, c=HUE_PALETTE["Accent2"])
+                s = Sphere(pos=p, r=0.002, c=COLOR_PALETTE["Accent2"])
                 self.plotter.at(1).add(s)
                 self.patch_future_spheres.append(s)
             if len(future_pts) >= 2:
                 self.patch_future_line = Line(
-                    future_pts, c=HUE_PALETTE["Accent2"], lw=1
+                    future_pts, c=COLOR_PALETTE["Accent2"], lw=1
                 )
                 self.plotter.at(1).add(self.patch_future_line)
 
@@ -737,7 +740,7 @@ class PrimaryButtonWidgetOps:
             "pos": (0.9, 0.2),
             "states": ["Primary Target"],
             "c": ["w"],
-            "bc": [HUE_PALETTE["Primary"]],
+            "bc": [COLOR_PALETTE["Primary"]],
             "size": FONT_SIZE,
             "font": FONT,
             "bold": False,
@@ -789,7 +792,7 @@ class PrevButtonWidgetOps:
             "pos": (0.88, 0.13),
             "states": ["<"],
             "c": ["w"],
-            "bc": [HUE_PALETTE["Primary"]],
+            "bc": [COLOR_PALETTE["Primary"]],
             "size": FONT_SIZE,
             "font": FONT,
             "bold": False,
@@ -841,7 +844,7 @@ class NextButtonWidgetOps:
             "pos": (0.93, 0.13),
             "states": [">"],
             "c": ["w"],
-            "bc": [HUE_PALETTE["Primary"]],
+            "bc": [COLOR_PALETTE["Primary"]],
             "size": FONT_SIZE,
             "font": FONT,
             "bold": False,
@@ -1642,7 +1645,7 @@ class CorrelationPlotWidgetOps:
                 ax=g.ax_joint,
                 s=8,
                 alpha=0.8,
-                palette=HUE_PALETTE,
+                palette=COLOR_PALETTE,
             )
 
             sns.kdeplot(
@@ -1653,7 +1656,7 @@ class CorrelationPlotWidgetOps:
                 fill=True,
                 alpha=0.2,
                 common_norm=False,
-                palette=HUE_PALETTE,
+                palette=COLOR_PALETTE,
                 legend=False,
                 warn_singular=False,
             )
@@ -1666,7 +1669,7 @@ class CorrelationPlotWidgetOps:
                 fill=True,
                 alpha=0.2,
                 common_norm=False,
-                palette=HUE_PALETTE,
+                palette=COLOR_PALETTE,
                 legend=False,
                 warn_singular=False,
             )
@@ -1777,7 +1780,7 @@ class CorrelationPlotWidgetOps:
             ).to_3d(z=0.05)
 
             circle = Circle(pos=gui_location.to_numpy(), r=3.0, res=16)
-            circle.c("green")
+            circle.c(COLOR_PALETTE["Highlighted"])
             self.plotter.at(0).add(circle)
             self.mlh_circles.append(circle)
 
@@ -1791,7 +1794,7 @@ class CorrelationPlotWidgetOps:
             self.plotter.at(0).remove(self.highlight_circle)
 
         self.highlight_circle = Circle(pos=gui_location.to_numpy(), r=3.0, res=16)
-        self.highlight_circle.c("red")
+        self.highlight_circle.c(COLOR_PALETTE["Selected"])
         self.plotter.at(0).add(self.highlight_circle)
 
     def update_plot(self, widget: Image, msgs: list[TopicMessage]) -> tuple[Any, bool]:
@@ -1997,7 +2000,7 @@ class HypothesisMeshWidgetOps:
             "evidence_slopes": updater_data["evidence_slopes"],
         }
 
-    def _extract_mod_ids(
+    def _extract_ids_at_step(
         self, episode: str, step: int, obj: str
     ) -> tuple[Iterable[int], Iterable[int]]:
         """Return added and removed hypothesis ids."""
@@ -2059,7 +2062,7 @@ class HypothesisMeshWidgetOps:
         rows_back: list[dict] = []
         episode_b, step_b, idx_b = episode, step, ix
         while True:
-            added_ids, removed_ids = self._extract_mod_ids(episode_b, step_b, obj)
+            added_ids, removed_ids = self._extract_ids_at_step(episode_b, step_b, obj)
             idx_prev = trace_hypothesis_backward(
                 idx_b, removed_ids=sorted(removed_ids), added_ids=sorted(added_ids)
             )
@@ -2090,7 +2093,7 @@ class HypothesisMeshWidgetOps:
             if episode_next is None or step_next is None:
                 break
 
-            _, removed_ids = self._extract_mod_ids(episode_next, step_next, obj)
+            _, removed_ids = self._extract_ids_at_step(episode_next, step_next, obj)
             idx_next = trace_hypothesis_forward(idx_f, removed_ids=sorted(removed_ids))
             if idx_next is None:
                 break
@@ -2166,7 +2169,7 @@ class HypothesisMeshWidgetOps:
 
         # Add sphere for sensor's hypothesized location
         sensor_pos = (hypothesis["Loc_x"], hypothesis["Loc_y"], hypothesis["Loc_z"])
-        self.sensor_sphere = Sphere(pos=sensor_pos, r=0.003).c(HUE_PALETTE["Primary"])
+        self.sensor_sphere = Sphere(pos=sensor_pos, r=0.003).c(COLOR_PALETTE["Primary"])
         self.plotter.at(2).add(self.sensor_sphere)
 
         self.updaters[1].expire_topic("selected_hypothesis")
@@ -2252,7 +2255,7 @@ class HypothesisMeshWidgetOps:
 
         spheres_list = self.past_path_spheres if past else self.future_path_spheres
         line_attr = "past_path_line" if past else "future_path_line"
-        color = HUE_PALETTE["Primary"] if past else HUE_PALETTE["Accent2"]
+        color = COLOR_PALETTE["Primary"] if past else COLOR_PALETTE["Accent2"]
 
         for p in points:
             s = Sphere(pos=p, r=0.002, c=color)
@@ -2425,7 +2428,7 @@ class HypSpaceSizeWidgetOps:
             x="step",
             y="idx_current",
             label=str(current_object),
-            color=HUE_PALETTE["Primary"],
+            color=COLOR_PALETTE["Primary"],
         )
         sns.lineplot(
             ax=ax,
@@ -2433,7 +2436,7 @@ class HypSpaceSizeWidgetOps:
             x="step",
             y="idx_others",
             label="other objects",
-            color=HUE_PALETTE["Secondary"],
+            color=COLOR_PALETTE["Secondary"],
         )
         sns.lineplot(
             ax=ax,
@@ -2441,7 +2444,7 @@ class HypSpaceSizeWidgetOps:
             x="step",
             y="idx_total",
             label="total",
-            color=HUE_PALETTE["Accent"],
+            color=COLOR_PALETTE["Accent3"],
         )
 
         ax.set_xlabel("Step")
@@ -2566,7 +2569,7 @@ class HypothesisLifespanWidgetOps:
             "evidence_slopes": updater_data["evidence_slopes"],
         }
 
-    def _extract_mod_ids(
+    def _extract_ids_at_step(
         self, episode: str, step: int, obj: str
     ) -> tuple[Iterable[int], Iterable[int]]:
         """Returns the added and removed ids."""
@@ -2682,7 +2685,7 @@ class HypothesisLifespanWidgetOps:
         rows_back: list[dict] = []
         episode_b, step_b, idx_b = episode, step, ix
         while True:
-            added_ids, removed_ids = self._extract_mod_ids(episode_b, step_b, obj)
+            added_ids, removed_ids = self._extract_ids_at_step(episode_b, step_b, obj)
             idx_prev = trace_hypothesis_backward(
                 idx_b, removed_ids=sorted(removed_ids), added_ids=sorted(added_ids)
             )
@@ -2719,7 +2722,7 @@ class HypothesisLifespanWidgetOps:
             if episode_next is None or step_next is None:
                 break
 
-            _, removed_ids = self._extract_mod_ids(episode_next, step_next, obj)
+            _, removed_ids = self._extract_ids_at_step(episode_next, step_next, obj)
             idx_next = trace_hypothesis_forward(idx_f, removed_ids=sorted(removed_ids))
 
             # Hypothesis is deleted
@@ -2787,7 +2790,7 @@ class HypothesisLifespanWidgetOps:
             marker="o",
             markersize=4,
             linewidth=1.2,
-            color=HUE_PALETTE["Primary"],
+            color=COLOR_PALETTE["Primary"],
             label="Evidence",
         )
         ax1.set_xlabel("Episode / Step")
@@ -2803,7 +2806,7 @@ class HypothesisLifespanWidgetOps:
             marker="o",
             markersize=4,
             linewidth=1.2,
-            color=HUE_PALETTE["Secondary"],
+            color=COLOR_PALETTE["Secondary"],
             label="Evidence Slope",
         )
         ax2.set_ylabel("Recent Evidence Growth")

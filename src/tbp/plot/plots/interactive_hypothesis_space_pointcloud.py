@@ -58,6 +58,20 @@ FONT = "Arial"
 FONT_SIZE = 25
 
 
+COLOR_PALETTE = {
+    "Blue": Palette.as_hex("numenta_blue"),
+    "Pink": Palette.as_hex("pink"),
+    "Purple": Palette.as_hex("purple"),
+    "Gold": Palette.as_hex("gold"),
+    "Green": Palette.as_hex("green"),
+    "Primary": Palette.as_hex("numenta_blue"),
+    "Secondary": Palette.as_hex("purple"),
+    "Accent": Palette.as_hex("charcoal"),
+    "Accent2": Palette.as_hex("link_water"),
+    "Accent3": Palette.as_hex("rich_black"),
+}
+
+
 class StepMapper:
     """Bidirectional mapping between global step indices and (episode, local_step).
 
@@ -447,14 +461,14 @@ class GtMeshWidgetOps:
 
         if self.agent_sphere is None:
             self.agent_sphere = Sphere(
-                pos=agent_pos, r=0.004, c=Palette.as_hex("vivid_violet")
+                pos=agent_pos, r=0.004, c=COLOR_PALETTE["Secondary"]
             )
             self.plotter.at(1).add(self.agent_sphere)
         self.agent_sphere.pos(agent_pos)
 
         if self.gaze_line is None:
             self.gaze_line = Line(
-                agent_pos, patch_pos, c=Palette.as_hex("rich_black"), lw=4
+                agent_pos, patch_pos, c=COLOR_PALETTE["Accent3"], lw=4
             )
             self.plotter.at(1).add(self.gaze_line)
         self.gaze_line.points = [agent_pos, patch_pos]
@@ -507,15 +521,13 @@ class GtMeshWidgetOps:
 
             # Create small spheres at each position
             for p in points:
-                sphere = Sphere(pos=p, r=0.002, c=Palette.as_hex("vivid_violet"))
+                sphere = Sphere(pos=p, r=0.002, c=COLOR_PALETTE["Secondary"])
                 self.plotter.at(1).add(sphere)
                 self.agent_path_spheres.append(sphere)
 
             # Create a polyline connecting all points
             if len(points) >= 2:
-                self.agent_path_line = Line(
-                    points, c=Palette.as_hex("vivid_violet"), lw=1
-                )
+                self.agent_path_line = Line(points, c=COLOR_PALETTE["Secondary"], lw=1)
                 self.plotter.at(1).add(self.agent_path_line)
 
         self.plotter.at(1).render()
@@ -555,15 +567,13 @@ class GtMeshWidgetOps:
 
             # Create small black spheres at each patch position
             for p in points:
-                sphere = Sphere(pos=p, r=0.002, c=Palette.as_hex("rich_black"))
+                sphere = Sphere(pos=p, r=0.002, c=COLOR_PALETTE["Accent3"])
                 self.plotter.at(1).add(sphere)
                 self.patch_path_spheres.append(sphere)
 
             # Create a thin black polyline connecting all patch positions
             if len(points) >= 2:
-                self.patch_path_line = Line(
-                    points, c=Palette.as_hex("rich_black"), lw=1
-                )
+                self.patch_path_line = Line(points, c=COLOR_PALETTE["Accent3"], lw=1)
                 self.plotter.at(1).add(self.patch_path_line)
 
         self.plotter.at(1).render()
@@ -633,7 +643,7 @@ class AgentPathButtonWidgetOps:
             "pos": (0.16, 0.98),
             "states": ["Agent Path: On", "Agent Path: Off"],
             "c": ["w", "w"],
-            "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
+            "bc": [COLOR_PALETTE["Primary"], COLOR_PALETTE["Secondary"]],
             "size": FONT_SIZE,
             "font": FONT,
             "bold": False,
@@ -672,7 +682,7 @@ class PatchPathButtonWidgetOps:
             "pos": (0.37, 0.98),
             "states": ["Patch Path: On", "Patch Path: Off"],
             "c": ["w", "w"],
-            "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
+            "bc": [COLOR_PALETTE["Primary"], COLOR_PALETTE["Secondary"]],
             "size": FONT_SIZE,
             "font": FONT,
             "bold": False,
@@ -841,7 +851,7 @@ class HypSpaceWidgetOps:
         evidences, locations, pose_errors, ages, slopes = self._extract_obj_telemetry(
             episode_number, step_number, curr_object
         )
-        pts = Points(np.array(locations), r=6, c=Palette.as_hex("vivid_violet"))
+        pts = Points(np.array(locations), r=6, c=COLOR_PALETTE["Secondary"])
 
         if hyp_color_button == "Evidence":
             pts.cmap("viridis", evidences, vmin=0.0)
@@ -853,7 +863,7 @@ class HypSpaceWidgetOps:
             mlh_sphere = Sphere(
                 pos=locations[int(np.argmax(evidences))],
                 r=0.002,
-                c=Palette.as_hex("numenta_blue"),
+                c=COLOR_PALETTE["Primary"],
             )
             self.mlh_sphere = mlh_sphere
             self.plotter.at(2).add(mlh_sphere)
@@ -904,7 +914,7 @@ class ModelButtonWidgetOps:
             "pos": (0.63, 0.98),
             "states": ["Pretrained Model: On", "Pretrained Model: Off"],
             "c": ["w", "w"],
-            "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
+            "bc": [COLOR_PALETTE["Primary"], COLOR_PALETTE["Secondary"]],
             "size": FONT_SIZE,
             "font": FONT,
             "bold": False,
@@ -938,7 +948,7 @@ class HypScopeButtonWidgetOps:
             "pos": (0.85, 0.98),
             "states": ["Hypotheses: On", "Hypotheses: Off"],
             "c": ["w", "w"],
-            "bc": [Palette.as_hex("numenta_blue"), Palette.as_hex("vivid_violet")],
+            "bc": [COLOR_PALETTE["Primary"], COLOR_PALETTE["Secondary"]],
             "size": FONT_SIZE,
             "font": FONT,
             "bold": False,
@@ -978,12 +988,12 @@ class HypColorButtonWidgetOps:
             "states": ["None", "Evidence", "MLH", "Pose Error", "Slope", "Ages"],
             "c": ["w", "w", "w", "w", "w", "w"],
             "bc": [
-                Palette.as_hex("link_water"),
-                Palette.as_hex("numenta_blue"),
-                Palette.as_hex("vivid_violet"),
-                Palette.as_hex("bossanova"),
-                Palette.as_hex("charcoal"),
-                Palette.as_hex("amethyst"),
+                COLOR_PALETTE["Accent"],
+                COLOR_PALETTE["Primary"],
+                COLOR_PALETTE["Secondary"],
+                COLOR_PALETTE["pink"],
+                COLOR_PALETTE["Gold"],
+                COLOR_PALETTE["Green"],
             ],
             "size": FONT_SIZE - 5,
             "font": FONT,
@@ -1217,7 +1227,7 @@ class LinePlotWidgetOps:
             ax_left.plot(
                 x[start_idx:],
                 slopes[start_idx:],
-                color=Palette.as_hex("numenta_blue"),
+                color=COLOR_PALETTE["Primary"],
                 label="Max slope",
             )
 
@@ -1225,7 +1235,7 @@ class LinePlotWidgetOps:
             x,
             hyp_space_sizes,
             linestyle="--",
-            color=Palette.as_hex("numenta_blue"),
+            color=COLOR_PALETTE["Primary"],
             label="Hypothesis space size",
         )
 
@@ -1235,7 +1245,7 @@ class LinePlotWidgetOps:
             hyp_space_sizes,
             0.0,
             alpha=0.15,
-            color=Palette.as_hex("numenta_blue"),
+            color=COLOR_PALETTE["Primary"],
             zorder=0,
         )
 
@@ -1251,7 +1261,7 @@ class LinePlotWidgetOps:
                 add_idx,
                 ymin,
                 ymax,
-                colors=Palette.as_hex("vivid_violet"),
+                colors=COLOR_PALETTE["Secondary"],
                 linestyles="--",
                 alpha=1.0,
                 linewidth=1.0,
