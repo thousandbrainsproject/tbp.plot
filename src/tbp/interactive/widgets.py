@@ -27,16 +27,32 @@ from tbp.interactive.widget_ops import (
 )
 
 
-def extract_slider_state(widget: Slider2D) -> int:
+def extract_button_state(widget: Button) -> str:
+    """Read the Button state.
+
+    Args:
+        widget: The Vedo Button.
+
+    Returns:
+        The current button state as a string.
+    """
+    return widget.status()
+
+
+def extract_slider_state(widget: Slider2D, round_value: bool = True) -> int:
     """Read the slider state and round it to an integer value.
 
     Args:
         widget: The Vedo slider.
+        round_value: Whether to round the value to an integer or keep it as float.
 
     Returns:
         The current slider value rounded to the nearest integer.
     """
-    return round(widget.GetRepresentation().GetValue())
+    value = widget.GetRepresentation().GetValue()
+    if round_value:
+        value = round(value)
+    return value
 
 
 def set_slider_state(widget: Slider2D, value: Any) -> None:

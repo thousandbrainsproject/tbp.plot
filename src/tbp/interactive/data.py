@@ -9,14 +9,17 @@
 from __future__ import annotations
 
 import os
+import pickle
+import types
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
+import torch
 import trimesh
-from vedo import Mesh
+from vedo import Mesh, Points
 
 from tbp.plot.plots.stats import deserialize_json_chunks
 
@@ -98,6 +101,84 @@ class YCBMeshLoader:
         obj.rotate_x(-90)
 
         return obj
+
+
+class _MontyShimUnpickler(pickle.Unpickler):
+    """Unpickler that shims out ``tbp.monty`` classes with lightweight dummies.
+
+    Any class reference from a module path starting with ``tbp.monty`` is
+    redirected to a dynamically created dummy class. This allows deserialization
+    of checkpoints that reference ``tbp.monty`` types even when the actual
+    package is not installed, while still making object attributes
+    (e.g., ``.pos``, ``.x``) accessible.
+
+    Dummy classes are cached by ``(module, name)`` so that repeated lookups
+    return the same type.
+    """
+
+    _cache = {}  # cache dummy classes
+
+    def find_class(self, module, name):
+        if module.startswith("tbp.monty"):
+            key = (module, name)
+            cls = self._cache.get(key)
+            if cls is None:
+                cls = type(name, (), {})
+                self._cache[key] = cls
+            return cls
+        return super().find_class(module, name)
+
+
+class PretrainedModelsLoader:
+    """Load Monty pretrained Models as point cloud Vedo object."""
+
+    def __init__(self, data_path: str, lm_id: int = 0, input_channel: str = "patch"):
+        """Initialize the loader.
+
+        Args:
+            data_path: Path to the `model.pt` file holding the pretrained models.
+            lm_id: Which learning module to use when extracting the pretrained graphs.
+            input_channel: Which channel to use for extracting the pretrained graphs.
+        """
+        self.path = data_path
+        models = self._torch_load_with_optional_shim()["lm_dict"][lm_id]["graph_memory"]
+        self.graphs = {k: v[input_channel]._graph for k, v in models.items()}
+
+    def _torch_load_with_optional_shim(self, map_location="cpu"):
+        """Load a torch checkpoint with optional fallback for tbp.monty shimming.
+
+        Try a standard torch.load first (weights_only=False because we need objects).
+        If tbp.monty isn't installed and the checkpoint references it, optionally
+        retry using a restricted Unpickler that only dummies tbp.monty.* symbols.
+
+        Args:
+            map_location: Device mapping passed to `torch.load` (default: "cpu").
+
+        Returns:
+            The deserialized checkpoint object.
+
+        Raises:
+            ModuleNotFoundError: If a missing module other than `tbp.monty` is required.
+        """
+        try:
+            return torch.load(self.path, map_location=map_location, weights_only=False)
+        except ModuleNotFoundError as e:
+            # Only intercept the specific missing tbp.monty namespace
+            if "tbp.monty" not in str(e):
+                raise
+
+            shim_pickle_module = types.ModuleType("monty_shim_pickle")
+            shim_pickle_module.Unpickler = _MontyShimUnpickler
+
+            return torch.load(
+                self.path,
+                map_location=map_location,
+                weights_only=False,
+                pickle_module=shim_pickle_module,
+            )
+
+    def create_model(self, obj_name: str) -> Points:
+        return Points(self.graphs[obj_name].pos.numpy(), r=4, c="gray")
 
 
 class DataParser:
