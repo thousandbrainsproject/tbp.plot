@@ -12,9 +12,10 @@ from __future__ import annotations
 from typing import Any
 
 from pubsub.core import Publisher
-from vedo import Button, Slider2D
+from vedo import Button, Plotter, Slider2D
 
-from tbp.interactive.topics import TopicMessage
+from tbp.interactive.events import EventSpec
+from tbp.interactive.topics import TopicMessage, TopicSpec
 from tbp.interactive.utils import VtkDebounceScheduler
 from tbp.interactive.widget_ops import (
     HasStateToMessages,
@@ -126,6 +127,7 @@ class Widget[WidgetT, StateT]:
         widget_ops: Composed functionality for get/set/add/remove operations.
         debounce_sec: Debounce delay in seconds for change publications.
         dedupe: If True, skip publishing unchanged values.
+        scopes: List of integer scopes this widget belongs to.
 
     Runtime Attributes:
         widget: The created widget instance.
@@ -145,11 +147,13 @@ class Widget[WidgetT, StateT]:
             | HasUpdaters[WidgetT]
             | WidgetOpsProto
         ),
+        scopes: list[int] | None,
         bus: Publisher,
         scheduler: VtkDebounceScheduler,
         debounce_sec: float = 0.25,
         dedupe: bool = True,
     ):
+        self.scopes = scopes or []
         self.bus = bus
         self.scheduler = scheduler
         self.debounce_sec = debounce_sec
@@ -160,10 +164,18 @@ class Widget[WidgetT, StateT]:
         self.state: StateT | None = None
         self.last_published_state: StateT | None = None
         self._sched_key = object()  # hashable unique key
+        self._visible: bool = True
 
         if isinstance(self.widget_ops, HasUpdaters):
             for topic in self.updater_topics:
                 self.bus.subscribe(self._on_update_topic, topic)
+
+            for event in self.updater_events:
+                self.widget_ops.plotter.add_callback(event, self._on_event)
+
+    @property
+    def is_visible(self) -> bool:
+        return self._visible
 
     @property
     def updater_topics(self) -> set[str]:
@@ -175,7 +187,29 @@ class Widget[WidgetT, StateT]:
         if not isinstance(self.widget_ops, HasUpdaters):
             return set()
 
-        return {t.name for u in self.widget_ops.updaters for t in u.topics}
+        return {
+            t.name
+            for u in self.widget_ops.updaters
+            for t in u.topics
+            if isinstance(t, TopicSpec)
+        }
+
+    @property
+    def updater_events(self) -> set[str]:
+        """Names of events that can update this widget with `WidgetUpdater`.
+
+        Returns:
+            A set of event triggers the widget listens to for updates.
+        """
+        if not isinstance(self.widget_ops, HasUpdaters):
+            return set()
+
+        return {
+            e.name
+            for u in self.widget_ops.updaters
+            for e in u.topics
+            if isinstance(e, EventSpec)
+        }
 
     def add(self) -> None:
         """Create the widget and register the debounce callback.
@@ -239,6 +273,24 @@ class Widget[WidgetT, StateT]:
         self.state = self.extract_state()
         self.scheduler.schedule_once(self._sched_key, self.debounce_sec)
 
+    def _on_event(self, event) -> None:
+        if not isinstance(self.widget_ops, HasUpdaters):
+            return
+
+        msg = TopicMessage(name=event.name, value=event)
+
+        for updater in self.widget_ops.updaters:
+            self.widget, publish_state = updater(self.widget, msg)
+            if publish_state:
+                self.state = self.extract_state()
+                self.scheduler.schedule_once(self._sched_key, self.debounce_sec)
+
+        if hasattr(self.widget_ops, "plotter") and isinstance(
+            self.widget_ops.plotter, Plotter
+        ):
+            self._set_visibility(self.is_visible)
+            self.widget_ops.plotter.render()
+
     def _on_update_topic(self, msg: TopicMessage):
         if not isinstance(self.widget_ops, HasUpdaters):
             return
@@ -248,6 +300,12 @@ class Widget[WidgetT, StateT]:
             if publish_state:
                 self.state = self.extract_state()
                 self.scheduler.schedule_once(self._sched_key, self.debounce_sec)
+
+        if hasattr(self.widget_ops, "plotter") and isinstance(
+            self.widget_ops.plotter, Plotter
+        ):
+            self._set_visibility(self.is_visible)
+            self.widget_ops.plotter.render()
 
     def _on_debounce_fire(self) -> None:
         """Handler fired by the scheduler to publish debounced state."""
@@ -267,3 +325,47 @@ class Widget[WidgetT, StateT]:
                 self.bus.sendMessage(msg.name, msg=msg)
 
             self.last_published_state = state
+
+    def on(self) -> None:
+        """Make this widget visually 'on'."""
+        self._set_visibility(True)
+
+    def off(self) -> None:
+        """Make this widget visually 'off'."""
+        self._set_visibility(False)
+
+    def _supports_toggle(self, obj: object) -> bool:
+        return hasattr(obj, "on") and hasattr(obj, "off")
+
+    def _toggle_single(self, obj: object | None, visible: bool) -> None:
+        """Toggle a single object if it supports .on() / .off()."""
+        if obj is None:
+            return
+        if not self._supports_toggle(obj):
+            return
+
+        if visible:
+            obj.on()
+        else:
+            obj.off()
+
+    def _toggle_container(self, attr: object, visible: bool) -> None:
+        """Toggle first-level items inside common container types."""
+        if isinstance(attr, (list, tuple, set)):
+            for item in attr:
+                self._toggle_single(item, visible)
+
+        elif isinstance(attr, dict):
+            for item in attr.values():
+                self._toggle_single(item, visible)
+
+    def _set_visibility(self, visible: bool) -> None:
+        self._visible = visible
+
+        # Iterate over widget_ops attributes to find vedo-style objects
+        # that also support .on() / .off(). This lets you attach extra
+        # meshes, paths, spheres, etc., and have them follow scope visibility.
+        self._toggle_single(self.widget, visible)
+        for attr in vars(self.widget_ops).values():
+            self._toggle_single(attr, visible)
+            self._toggle_container(attr, visible)

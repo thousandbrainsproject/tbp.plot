@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+from tbp.interactive.events import EventSpec
 from tbp.interactive.topics import TopicMessage, TopicSpec
 
 if TYPE_CHECKING:
@@ -56,7 +57,7 @@ class WidgetUpdater[WidgetT]:
             `topics`.
     """
 
-    topics: Iterable[TopicSpec]
+    topics: Iterable[TopicSpec | EventSpec]
     callback: Callable[
         [WidgetT | None, list[TopicMessage]], tuple[WidgetT | None, bool]
     ]
@@ -85,6 +86,17 @@ class WidgetUpdater[WidgetT]:
             True if the topic is listed in ``topics``. False otherwise.
         """
         return any(spec.name == msg.name for spec in self.topics)
+
+    def expire_topic(self, topic_name: str) -> None:
+        """Expire (remove) the stored message for a given topic.
+
+        After expiration, the updater may require a new message for that topic
+        before becoming ready again.
+
+        Args:
+            topic_name: The topic whose message should be invalidated.
+        """
+        self._inbox.pop(topic_name, None)
 
     def __call__(
         self, widget: WidgetT | None, msg: TopicMessage

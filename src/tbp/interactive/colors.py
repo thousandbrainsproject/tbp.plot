@@ -35,22 +35,27 @@ class Palette:
     available names.
     """
 
-    # Primary Colors
+    # Primary colors
     indigo: str = "#2f2b5c"
     numenta_blue: str = "#00a0df"
 
-    # Secondary Colors
+    # Secondary colors
     bossanova: str = "#5c315f"
     vivid_violet: str = "#86308b"
     blue_violet: str = "#655eb2"
     amethyst: str = "#915acc"
 
-    # Accent Colors/Shades
+    # Accent colors/shades
     rich_black: str = "#000000"
     charcoal: str = "#3f3f3f"
     link_water: str = "#dfe6f5"
 
-    # ---------- Internal helper ----------
+    # Scientific notations colors
+    pink: str = "#f737bd"
+    purple: str = "#5d11bf"
+    green: str = "#008e43"
+    gold: str = "#ffbe31"
+
     @classmethod
     def _validate(cls, name: str) -> str:
         if not hasattr(cls, name):
@@ -62,7 +67,6 @@ class Palette:
             raise KeyError(msg)
         return getattr(cls, name)
 
-    # ---------- Public API ----------
     @classmethod
     def as_hex(cls, name: str) -> Color:
         """Return the raw hex string for a color name."""
