@@ -67,7 +67,6 @@ from tbp.plot.registry import attach_args, register
 
 logger = logging.getLogger(__name__)
 
-vedo.settings.enable_default_keyboard_callbacks = False
 
 COLOR_PALETTE = {
     "Maintained": Palette.as_hex("numenta_blue"),
@@ -3220,6 +3219,8 @@ def main(experiment_log_dir: str, objects_mesh_dir: str) -> int:
     Returns:
         Exit code.
     """
+    vedo.settings.enable_default_keyboard_callbacks = False
+
     if not Path(experiment_log_dir).exists():
         logger.error(f"Experiment path not found: {experiment_log_dir}")
         return 1

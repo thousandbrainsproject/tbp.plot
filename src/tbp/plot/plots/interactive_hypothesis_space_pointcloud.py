@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import vedo
 from matplotlib import transforms
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
@@ -1750,6 +1751,8 @@ def main(
     Returns:
         Exit code.
     """
+    vedo.settings.enable_default_keyboard_callbacks = False
+
     if not Path(experiment_log_dir).exists():
         logger.error(f"Experiment path not found: {experiment_log_dir}")
         return 1
