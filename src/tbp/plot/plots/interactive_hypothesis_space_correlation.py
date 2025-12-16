@@ -1680,7 +1680,7 @@ class CorrelationPlotWidgetOps:
 
         g.ax_joint.set_xlim(-2.0, 2.0)
         g.ax_joint.set_ylim(0, 3.25)
-        g.ax_joint.set_xlabel("Recent Evidence Growth", labelpad=10)
+        g.ax_joint.set_xlabel("Recent Evidence Change", labelpad=10)
         g.ax_joint.set_ylabel(y, labelpad=10)
         g.figure.tight_layout()
 
@@ -2793,7 +2793,7 @@ class HypothesisLifespanWidgetOps:
             color=COLOR_PALETTE["Primary"],
             label="Evidence",
         )
-        ax1.set_xlabel("Episode / Step")
+        ax1.set_xlabel("Time")
         ax1.set_ylabel("Evidence")
 
         # Evidence slopes plot on right axis
@@ -2809,7 +2809,7 @@ class HypothesisLifespanWidgetOps:
             color=COLOR_PALETTE["Secondary"],
             label="Evidence Slope",
         )
-        ax2.set_ylabel("Recent Evidence Growth")
+        ax2.set_ylabel("Recent Evidence Change")
 
         # Setting ticks on x-axis
         x_min, x_max = df["x"].min(), df["x"].max()
@@ -2838,7 +2838,7 @@ class HypothesisLifespanWidgetOps:
         # Legend for both axes
         label_renames = {
             "Evidence": "Evidence",
-            "Evidence Slope": "Recent Evidence Growth",
+            "Evidence Slope": "Recent Evidence Change",
         }
         lines, labels = [], []
         for ax in (ax1, ax2):
@@ -2850,7 +2850,6 @@ class HypothesisLifespanWidgetOps:
         if lines:
             ax1.legend(lines, labels, loc="best", frameon=True)
 
-        ax1.set_title("Hypothesis Evidence Accumulation\nand Growth Over Time")
         fig.tight_layout()
 
         widget = Image(fig)
@@ -2864,7 +2863,7 @@ class HypothesisLifespanWidgetOps:
         info = (
             f"Age: {hyp['age']}\n"
             + f"Evidence: {hyp['Evidence']:.2f}\n"
-            + f"Recent Evidence Growth: {hyp['Evidence Slope']:.2f}\n"
+            + f"Recent Evidence Change: {hyp['Evidence Slope']:.2f}\n"
             + f"Pose Error: {hyp['Pose Error']:.2f}"
         )
         self.info_widget = Text2D(txt=info, pos="top-right", font=FONT)

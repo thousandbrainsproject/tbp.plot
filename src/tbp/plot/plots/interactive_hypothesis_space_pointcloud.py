@@ -1283,7 +1283,7 @@ class LinePlotWidgetOps:
                 label="Current step",
             )
 
-        ax_left.set_ylabel("Max Recent Evidence Growth")
+        ax_left.set_ylabel("Max Recent Evidence Change")
         ax_right.set_ylabel("Hyp space size")
 
         # Collect legend entries
@@ -1300,7 +1300,7 @@ class LinePlotWidgetOps:
         time_labels: list[str] = []
 
         label_renames = {
-            "Max slope": "Max Recent Evidence Growth",
+            "Max slope": "Max Recent Evidence Change",
             "Hypothesis space size": "Hypothesis Space Size",
             "Burst": "Sampling Burst",
             "Current step": "Current Step",
