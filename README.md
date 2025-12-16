@@ -2,9 +2,44 @@
 
 This is a visualization tool for plotting [tbp.monty](https://github.com/thousandbrainsproject/tbp.monty) visualizations.
 
+- [Gallery](#gallery)
 - [Installation](#installation)
 - [Usage](#usage)
 - [Development](#development)
+
+
+## Gallery
+
+<table width="100%">
+  <tr>
+    <th width="50%">Burst Sampling</th>
+    <th width="50%">Hypothesis Space</th>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="assets/burst.gif" width="100%">
+    </td>
+    <td align="center">
+      <img src="assets/hyp_space.gif" width="100%">
+    </td>
+  </tr>
+</table>
+
+<table width="100%">
+  <tr>
+    <th width="50%">Reference Frame</th>
+    <th width="50%">Terminal Conditions</th>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="assets/reference_frame.png" width="80%">
+    </td>
+    <td align="center">
+      <img src="assets/terminal_conditions.png" width="100%">
+    </td>
+  </tr>
+</table>
+
 
 ## Installation
 
