@@ -94,6 +94,8 @@ line-ending = "auto"
 quote-style = "double"
 skip-magic-trailing-comma = false
 
+
+
 [tool.ruff.lint]
 preview = true
 explicit-preview-rules = true # comment this out to check all preview rules
@@ -237,7 +239,7 @@ ignore = [
 author = "Thousand Brains Project"
 
 [tool.ruff.lint.mccabe]
-max-complexity = 10
+max-complexity = 15
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

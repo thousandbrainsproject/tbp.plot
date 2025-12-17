@@ -34,6 +34,10 @@ from vedo import (
     Text2D,
 )
 
+from tbp.interactive.animator import (
+    WidgetAnimator,
+    make_slider_step_actions_for_widget,
+)
 from tbp.interactive.colors import Palette
 from tbp.interactive.data import (
     DataLocator,
@@ -63,7 +67,6 @@ from tbp.plot.registry import attach_args, register
 
 logger = logging.getLogger(__name__)
 
-vedo.settings.enable_default_keyboard_callbacks = False
 
 COLOR_PALETTE = {
     "Maintained": Palette.as_hex("numenta_blue"),
@@ -2970,6 +2973,7 @@ class InteractivePlot:
         self.event_bus = Publisher()
         self.plotter = Plotter(shape=renderer_areas, sharecam=False).render()
         self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=33)
+        self.animator = None
 
         # create and add the widgets to the plotter
         self._widgets = self.create_widgets()
@@ -2980,7 +2984,7 @@ class InteractivePlot:
         self._widgets["topk_slider"].set_state(0)
 
         self.scope_viewer = ScopeViewer(self.plotter, self._widgets)
-        self.plotter.add_callback("KeyPress", self._on_keypress_quit)
+        self.plotter.add_callback("KeyPress", self._on_keypress)
 
         self.plotter.at(0).show(
             camera=deepcopy(self.cam_dict),
@@ -3024,7 +3028,7 @@ class InteractivePlot:
             scopes=[1, 2, 3],
             bus=self.event_bus,
             scheduler=self.scheduler,
-            debounce_sec=0.5,
+            debounce_sec=0.1,
             dedupe=True,
         )
 
@@ -3158,10 +3162,46 @@ class InteractivePlot:
 
         return widgets
 
-    def _on_keypress_quit(self, event):
+    def create_step_animator(self):
+        step_slider = self._widgets["step_slider"]
+        slider_current_value = step_slider.widget_ops.extract_state(
+            widget=step_slider.widget
+        )
+        slider_max_value = int(step_slider.widget.range[1])
+
+        step_actions = make_slider_step_actions_for_widget(
+            widget=step_slider,
+            start_value=slider_current_value,
+            stop_value=slider_max_value,
+            num_steps=slider_max_value - slider_current_value + 1,
+            step_dt=0.5,
+        )
+
+        return WidgetAnimator(
+            scheduler=self.scheduler,
+            actions=step_actions,
+            key_prefix="step_animator",
+        )
+
+    def _on_keypress(self, event):
         key = getattr(event, "keypress", None)
-        if key is not None and key.lower() == "q":
+        if key is None:
+            return
+
+        if key.lower() == "q":
             self.plotter.interactor.ExitCallback()
+            return
+
+        if hasattr(self, "animator") and event.at == 0:
+            if key == "a":
+                if self.animator is not None:
+                    self.animator.stop()
+
+                self.animator = self.create_step_animator()
+                self.animator.start()
+            elif key == "s":
+                if self.animator is not None:
+                    self.animator.stop()
 
 
 @register(
@@ -3179,6 +3219,8 @@ def main(experiment_log_dir: str, objects_mesh_dir: str) -> int:
     Returns:
         Exit code.
     """
+    vedo.settings.enable_default_keyboard_callbacks = False
+
     if not Path(experiment_log_dir).exists():
         logger.error(f"Experiment path not found: {experiment_log_dir}")
         return 1
