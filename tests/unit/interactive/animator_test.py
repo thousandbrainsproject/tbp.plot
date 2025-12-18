@@ -133,6 +133,9 @@ class TestWidgetAnimator(unittest.TestCase):
         animator.stop()  # should not raise
         self.assertFalse(animator._running)
 
+    def tearDown(self) -> None:
+        self.scheduler.shutdown()
+
 
 class TestMakeSliderStepActions(unittest.TestCase):
     def test_num_steps_less_than_2_returns_empty(self) -> None:
@@ -211,3 +214,7 @@ class TestMakeSliderStepActions(unittest.TestCase):
         with patch("time.perf_counter", lambda: 1.01):
             scheduler._on_timer(None, "TimerEvent")
         self.assertEqual(widget.values, [0.0, 0.5, 1.0])
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -173,3 +173,7 @@ class TestScopeViewerKeypress(ScopeViewerSetup):
         self.assertEqual(self.viewer.active_scopes, set())
         for widget in self.widgets.values():
             self.assertFalse(widget.is_visible)
+
+
+if __name__ == "__main__":
+    unittest.main()
