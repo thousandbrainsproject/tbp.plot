@@ -685,7 +685,11 @@ class GtMeshWidgetOps:
         target_rot = target["primary_target_rotation_euler"]
         target_pos = target["primary_target_position"]
 
-        widget = self.ycb_loader.create_mesh(target_id).clone(deep=True)
+        try:
+            widget = self.ycb_loader.create_mesh(target_id).clone(deep=True)
+        except FileNotFoundError:
+            return widget, False
+
         widget.rotate_x(target_rot[0])
         widget.rotate_y(target_rot[1])
         widget.rotate_z(target_rot[2])
@@ -854,7 +858,11 @@ class MlhMeshWidgetOps:
         mlh_rot = mlh["rotation"]
         mlh_pos = mlh["location"]
 
-        widget = self.ycb_loader.create_mesh(mlh_id).clone(deep=True)
+        try:
+            widget = self.ycb_loader.create_mesh(mlh_id).clone(deep=True)
+        except FileNotFoundError:
+            return widget, False
+
         widget.rotate_x(mlh_rot[0])
         widget.rotate_y(mlh_rot[1])
         widget.rotate_z(mlh_rot[2])
