@@ -7,13 +7,14 @@ In this tutorial, we will build a simple interactive plot that uses a pub/sub ar
 
 We will construct an interactive plot gradually, starting from an empty scene and then adding four widgets, one at a time.
 Each widget introduces a new concept, but all of them follow the same core idea: widgets do not talk to each other directly.
-Instead, they publish and listen to messages on an shared event bus.
+Instead, they publish and listen to messages using a [publish–subscribe pattern](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern), where widgets emit messages on named topics and other widgets react to those topic messages without direct references to each other.
 
-By the end of this tutorial, you will understand how sliders and meshes are added to an interactive plot and how they synchronized through topic messages.
+By the end of this tutorial, you will understand how sliders and meshes are added to an interactive plot and how they are synchronized through topic messages.
 Along the way, we will introduce the `Widget` and `WidgetUpdater` classes, and we will implement several `WidgetOps` classes that define each Widget's behavior.
+Note that the interactive visualizations in `tbp.plot` are built using the [Vedo 3D library](https://vedo.embl.es/), which is a high-level wrapper around the visualization toolkit; [VTK](https://vtk.org/).
 
 
-The animation below shows the final interactive plot we will build in this tutorial. Episode and step sliders control the scene, while the ground-truth object and the MLH hypothesis update automatically in response.
+The animation below shows the final interactive plot we will build in this tutorial. Episode and step sliders control the scene, while the ground-truth object and the most likely hypothesis (MLH) update automatically in response.
 
 ![Final interactive plot](assets/interactive_tutorial_final.gif)
 
@@ -23,12 +24,12 @@ The animation below shows the final interactive plot we will build in this tutor
 ## Part 1: Create and Register a Minimal Interactive Plot
 
 In this section, we will set up the interactive plot class.
-It will open a window with three renderers, load the experiment json logs, and instantiate useful classes, e.g., `Plotter` and `Publisher`, that widgets will share later.
-There are no widgets yet, but by the end of this section you will have a runnable plot that is registered with the plotting CLI.
+It will open a window with three renderers, load the experiment JSON logs, and instantiate useful classes, e.g., `Plotter` and `Publisher`, that widgets will share later.
+There are no widgets yet, but by the end of this section, you will have a runnable plot that is registered with the plotting command-line interface (CLI).
 
 Create a new file under: `src/tbp/plot/plots/interactive_tutorial.py`
 
-Plots placed under `src/tbp/plot/plots/` are indexed by the plot registry, which is what makes them discoverable and runnable through the plotting entrypoints.
+Plots placed under `src/tbp/plot/plots/` are indexed by the plot registry, which is what makes them discoverable and runnable through the plotting registered function (i.e., functions with the decorator `@register`).
 
 Below is the complete starting code for Part 1.
 
@@ -150,16 +151,16 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
 ### Registering the Plot with `@register`
 
 The `@register` decorator declares a new plot entry named `interactive_tutorial`.
-This name is the handle you will use from the plotting CLI to run this plot.
+This name is the handle you will use with the plotting CLI to run this plot.
 The registry scans the files under `src/tbp/plot/plots/` and collects any functions decorated with `@register`.
 The registered `main` function is the plot’s entrypoint, where all the plotting code is placed.
 
 ### Attaching CLI Arguments with `@attach_args`
 
 The `@attach_args` decorator links an argument definition function to the plot.
-This allows the user to add argparse arguments which will be passed to the function `main`.
+This allows the user to add argparse arguments, which will be passed to the function `main`.
 
-In this tutorial we define one required argument, `experiment_log_dir`,
+In this tutorial, we define one required argument, `experiment_log_dir`,
 and one optional argument, `--objects_mesh_dir`, which defaults to the YCB mesh directory.
 
 ### The `InteractivePlot` Class
@@ -175,8 +176,9 @@ We initialize it here so any mesh visualization widget can reuse it.
 - `Publisher()` creates the shared event bus.
 In later sections, widgets will publish topic messages to this bus and subscribe to them through updaters.
 
-- `VtkDebounceScheduler(plotter, period_ms)` provides a central debounce mechanism so widget updates can be throttled.
+- `VtkDebounceScheduler(plotter, period_ms)` provides a central "debounce" mechanism so widget updates can be throttled.
 Interactive widgets can produce a high volume of callbacks, especially while dragging sliders.
+Throttling with a debounce mechanism ensures the plot updates smoothly and stays responsive, rather than attempting to render computationally intense objects many times in a short period of time.
 
 ### Renderers and `Vedo.Plotter`
 
@@ -189,11 +191,17 @@ We also set `sharecam=False` so each renderer can have independent camera settin
 
 Finally, we call `.show(...)` on each renderer to initialize them with the right configuration.
 
-Renderer 0 is intended for UI widgets, so we initialize it with a camera configuration, and we set `interactive=False` since we intend to show other renderers.
+Even though renderer 0 is mainly used as a UI area (sliders and other widgets), we still call `show()` on it to initialize its viewport and apply a camera configuration; every renderer needs to have a camera to render its widgets.
 Renderers 1 and 2 are intended for 3D content, so we initialize them with axes.
-We set the last renderer to be interactive. Vedo will not run any commands after an interactive renderer is shown.
+In Vedo, an important detail is that `show(interactive=True)` starts the interactive event loop and blocks any further execution.
+This means that the script effectively “stops here” and waits for user input, and you typically do not run additional setup code after that call.
 
-At this stage, running the plot should open a window with three regions and no widgets as shown below.
+For this reason, we call `show(interactive=False)` on renderers 0 and 1 while we are still constructing the full scene.
+These calls set up the renderers without entering the blocking interaction loop.
+Finally, we call `show(interactive=True)` once at the end (i.e., on renderer 2), which starts the event loop and makes the whole window responsive to user interaction, including widgets placed in renderers 0.
+
+At this stage, running the plot should open a window with three regions and no widgets, as shown below.
+To run the plot, you can use the command `uv run plot interactive_tutorial /path/to/experiment/logs/dir`
 
 
 ![Empty interactive plot](assets/empty.png)
@@ -201,7 +209,7 @@ At this stage, running the plot should open a window with three regions and no w
 
 ## Part 2: Add an Episode Slider Widget
 
-In this part we add the first widget to the plot, the episode slider.
+In this part, we add the first widget to the plot, the episode slider.
 We will do this in two steps.
 First, we will add a `create_widgets()` method and create a `Widget` instance.
 After that, we will implement the `WidgetOps` class that defines how the slider is created, how its state is extracted and set, and how it publishes topic messages.
@@ -284,7 +292,6 @@ Now we define the widget behavior. Add the following imports:
 
 ```python
 from collections.abc import Callable, Iterable
-from copy import deepcopy
 
 from tbp.interactive.data import DataLocator, DataLocatorStep
 from tbp.interactive.topics import TopicMessage
@@ -351,8 +358,11 @@ The `add()` method is also important.
 Instead of hard-coding the slider range, it queries the experiment log for available episodes and sets `xmax` accordingly.
 This keeps the UI consistent with the data, even if the number of episodes changes between runs.
 
+If you have not seen `DataLocator` before, it is worth skimming the earlier [DataParser and DataLocator tutorial](../data_parser/tutorial.md).
+In short, locators let the widget describe the path it needs from the experiment log once, and then reuse that defined data path whenever it needs to query or extract data.
+
 At the end of this part, the slider should be visible in renderer 0, and moving it publishes `episode_number` messages.
-See the animation below.
+See the animation below:
 
 
 ![Episode interactive plot](assets/episode.gif)
@@ -360,20 +370,20 @@ See the animation below.
 
 ## Part 3: Add a Step Slider That Reacts to the Episode Slider
 
-In Part 2 we added the episode slider and saw how a widget can publish state as a topic message.
-In this part we add the step slider, and this is the first time we introduce subscriptions.
+In Part 2, we added the episode slider and saw how a widget can publish state as a topic message.
+In this part, we add the step slider, and this is the first time we introduce subscriptions.
 The step slider depends on the currently selected episode because each episode can have a different number of valid steps.
 That means the step slider must listen for messages on the topic `episode_number` and adjust its range whenever the episode changes.
 
 We will follow the same pattern as before.
-First we create the widget in `InteractivePlot.create_widgets()`.
+First, we create the widget in `InteractivePlot.create_widgets()`.
 Then we implement the `StepSliderWidgetOps` class.
 The new concept is `WidgetUpdater`, which lets a widget react to one or more topics and update itself in response.
 
 
 ### Add the Step Slider Widget to `InteractivePlot`
 
-Start by adding the new imports for `WidgetUpdater`, `TopicSpec`, and any types needed by the step slider.
+Start by adding the new imports for `WidgetUpdater`, `TopicSpec`.
 
 ```python
 from tbp.interactive.topics import TopicMessage, TopicSpec
@@ -504,7 +514,7 @@ class StepSliderWidgetOps:
 ### Understanding `WidgetUpdater` and `TopicSpec`
 
 This is the first time we see an explicit subscription.
-A `WidgetUpdater` is essentially a small rule that says: when a specific set of topic messages are available, call a function.
+A `WidgetUpdater` is essentially a small rule that says: when a specific set of topic messages is available, call a function.
 
 The topics a `WidgetUpdater` cares about are described by `TopicSpec` objects.
 In this case, the step slider has a single `TopicSpec("episode_number", required=True)`.
@@ -512,20 +522,20 @@ That means the updater will only run if an `episode_number` message is present, 
 
 The callback signature is important.
 The callback takes the widget instance being updated (e.g., `Slider2D`) and the list of messages that matched the updater’s topic specs.
-The callback returns (widget, publish) where publish determines whether the Widget wrapper should publish messages after the update.
+The callback returns (widget, publish), where publish determines whether the Widget wrapper should publish messages after the update.
 We return `True` here because after resetting the step slider to 0, we want to publish `step_number = 0` so the rest of the widgets can know about this change.
 
 Dragging the episode slider will change the valid range of the step slider and reset it back to 0.
-Dragging the step slider will publish `step_number` messages, even though nothing subscribes to these messages yet.
-See animation below
+Dragging the step slider will also publish `step_number` messages, even though nothing subscribes to these messages yet.
+See the animation below:
 
 ![Step interactive plot](assets/step.gif)
 
 
 ## Part 4: Add the Ground-Truth Mesh Visualizer
 
-In Part 3 we added the step slider and introduced `WidgetUpdater` as the mechanism that allows a widget to react to topic messages.
-In this part we add our first display-only widget: a ground-truth mesh visualizer.
+In Part 3, we added the step slider and introduced `WidgetUpdater` as the mechanism that allows a widget to react to topic messages.
+In this part, we add our first display-only widget: a ground-truth mesh visualizer.
 This widget listens to `episode_number` and `step_number`, loads the target object mesh from YCB, and renders both the object and a simple agent visualization.
 
 Just like before, we start by wiring the widget into `InteractivePlot.create_widgets()`.
@@ -569,7 +579,7 @@ def create_widgets(self):
 
 Notice that this is the first time we pass an extra dependency into the WidgetOps constructor, `ycb_loader`.
 We already created `self.ycb_loader = YCBMeshLoader(data_path)` in Part 1, and now we finally use it.
-This is a common pattern in interactive plots, you initialize shared resources once in the class constructor and pass them into whichever widgets need them.
+This is a common pattern in interactive plots; you initialize shared resources once in the class constructor and pass them into whichever widgets need them.
 
 At this point, the widget is wired into the plot, but we still need to define what it does. That is `GtMeshWidgetOps`.
 
@@ -591,7 +601,7 @@ That update requires both `episode_number` and `step_number`, so we model it as 
 class GtMeshWidgetOps:
     """WidgetOps implementation for rendering the ground-truth target mesh.
 
-    This widget is display-only. It listens for `"episode_number"` updates,
+    This widget is display-only. It listens for "episode_number" updates,
     loads the target object's YCB mesh, applies the episode-specific rotations,
     scales and positions it, and adds it to the plotter. It does not publish
     any messages.
@@ -743,7 +753,7 @@ class GtMeshWidgetOps:
 Renderer 1 is no longer empty.
 When you change the episode slider, the ground-truth object mesh updates.
 When you change the step slider, a small sensor marker and a gaze line update to show where the sensor is and what it is looking at for the current step.
-See the animation below.
+See the animation below:
 
 
 ![Ground-truth interactive plot](assets/gt.gif)
@@ -751,12 +761,12 @@ See the animation below.
 
 ## Part 5: Add the MLH Visualizer
 
-In Part 4 we added the ground-truth mesh and used `WidgetUpdater` with multiple updaters inside a single widget.
-In this final part we add the MLH visualizer.
-Conceptually it is very similar to the ground-truth widget, it listens to the same topics and renders a mesh.
+In Part 4, we added the ground-truth mesh and used `WidgetUpdater` with multiple updaters inside a single widget.
+In this final part, we add the MLH visualizer.
+Conceptually, it is very similar to the ground-truth widget; it listens to the same topics and renders a mesh.
 Instead of loading the episode’s ground-truth target, it reads the model’s current best hypothesis (MLH) at the selected step and renders that object plus a small marker at the MLH location.
 
-We will follow the same two-step approach as before. First we add the widget to `InteractivePlot.create_widgets()`.
+We will follow the same two-step approach as before. First, we add the widget to `InteractivePlot.create_widgets()`.
 Then we implement the `MlhMeshWidgetOps` class.
 
 ### Add the MLH Widget to `InteractivePlot`
@@ -882,7 +892,7 @@ This concludes the tutorial.
 The ground-truth visualizer should now show the mesh and a step-dependent sensor visualization.
 The MLH visualizer should show the current MLH hypothesis mesh and a small green marker at the MLH location.
 Moving either slider updates both views by publishing and subscribing to specific topics.
-See the animation below.
+See the animation below:
 
 
 ![Final interactive plot](assets/interactive_tutorial_final.gif)
