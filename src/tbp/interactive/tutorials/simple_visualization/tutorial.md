@@ -11,7 +11,7 @@ Instead, they publish and listen to messages using a [publish–subscribe patter
 
 By the end of this tutorial, you will understand how sliders and meshes are added to an interactive plot and how they are synchronized through topic messages.
 Along the way, we will introduce the `Widget` and `WidgetUpdater` classes, and we will implement several `WidgetOps` classes that define each Widget's behavior.
-Note that the interactive visualizations in `tbp.plot` are built using the [Vedo 3D library](https://vedo.embl.es/), which is a high-level wrapper around the visualization toolkit; [VTK](https://vtk.org/).
+Note that the interactive visualizations in `tbp.plot` are built using the [Vedo 3D library](https://vedo.embl.es/), which is a high-level wrapper around the visualization toolkit [VTK](https://vtk.org/).
 
 
 The animation below shows the final interactive plot we will build in this tutorial. Episode and step sliders control the scene, while the ground-truth object and the most likely hypothesis (MLH) update automatically in response.
