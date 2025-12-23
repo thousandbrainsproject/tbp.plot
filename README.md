@@ -5,7 +5,7 @@ This is a visualization tool for plotting [tbp.monty](https://github.com/thousan
 - [Gallery](#gallery)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Development](#development)
+- [Contributions](#contributions)
 
 
 ## Gallery
