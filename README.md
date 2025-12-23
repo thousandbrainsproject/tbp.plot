@@ -105,6 +105,8 @@ We're always looking to improve the visualization tools available, and would lov
 
 If you're looking to contribute but don't know where to start, you can check out our [Issues page](https://github.com/thousandbrainsproject/tbp.plot/issues) for items that need tackling. These cover a mixture of things from refactoring work to debugging and proposals for new visualizations. 
 
+Finally, you are welcome to create a new Issue if you think of a visualization that you would like to see, but are unsure about how to implement it.
+
 ### Development Setup
 
 > [!NOTE]
