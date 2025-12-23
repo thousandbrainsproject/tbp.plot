@@ -5,7 +5,7 @@
 ### The Example Data
 
 This first section shows how to load data with a `DataParser`.
-We will use a toy example of some json data in the file `toy_data/detailed_run_stats.json`.
+We will use a toy example of some json data in a file at the path `toy_data/detailed_run_stats.json`.
 
 This data is structured as shown below.
 ```python
