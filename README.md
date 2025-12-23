@@ -97,7 +97,15 @@ options:
 ```
 
 
-## Development
+## Contributions
+
+### Ideas for Contributions
+
+We're always looking to improve the visualization tools available, and would love to see any plotting widgets you have developed.
+
+If you're looking to contribute but don't know where to start, you can check out our [Issues page](https://github.com/thousandbrainsproject/tbp.plot/issues) for items that need tackling. These cover a mixture of things from refactoring work to debugging and proposals for new visualizations. 
+
+### Development Setup
 
 > [!NOTE]
 > First, **make a fork of this repository**. Make any changes on your local fork. This repository is configured to only accept pull requests from forks.
