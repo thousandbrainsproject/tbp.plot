@@ -549,6 +549,7 @@ We first extend the imports because this widget renders meshes and uses a few ad
 ```python
 import numpy as np
 from vedo import Sphere, Line, Mesh, Sphere, Text2D
+from scipy.spatial.transform import Rotation
 ```
 
 
@@ -692,7 +693,7 @@ class GtMeshWidgetOps:
             self._locators["target"], episode=str(msgs_dict["episode_number"])
         )
         target_id = target["primary_target_object"]
-        target_rot = target["primary_target_rotation_euler"]
+        target_rot = target["primary_target_rotation_quat"]
         target_pos = target["primary_target_position"]
 
         try:
@@ -700,9 +701,11 @@ class GtMeshWidgetOps:
         except FileNotFoundError:
             return widget, False
 
-        widget.rotate_x(target_rot[0])
-        widget.rotate_y(target_rot[1])
-        widget.rotate_z(target_rot[2])
+        rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
+        rot_euler = rot.as_euler("xyz", degrees=True)
+        widget.rotate_x(rot_euler[0])
+        widget.rotate_y(rot_euler[1])
+        widget.rotate_z(rot_euler[2])
         widget.shift(*target_pos)
 
         self.plotter.at(1).add(widget)
@@ -873,9 +876,11 @@ class MlhMeshWidgetOps:
         except FileNotFoundError:
             return widget, False
 
-        widget.rotate_x(mlh_rot[0])
-        widget.rotate_y(mlh_rot[1])
-        widget.rotate_z(mlh_rot[2])
+        rot = Rotation.from_euler("xyz", np.array(mlh_rot), degrees=True).inv()
+        rot_euler = rot.as_euler("xyz", degrees=True)
+        widget.rotate_x(rot_euler[0])
+        widget.rotate_y(rot_euler[1])
+        widget.rotate_z(rot_euler[2])
         widget.shift(*self.default_object_position)
 
         self.plotter.at(2).add(widget)

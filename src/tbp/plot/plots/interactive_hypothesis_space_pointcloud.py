@@ -23,6 +23,7 @@ from matplotlib import transforms
 from matplotlib.lines import Line2D
 from matplotlib.patches import Rectangle
 from pubsub.core import Publisher
+from scipy.spatial.transform import Rotation
 from vedo import Button, Image, Line, Mesh, Plotter, Points, Slider2D, Sphere
 
 from tbp.interactive.animator import WidgetAnimator, make_slider_step_actions_for_widget
@@ -412,12 +413,19 @@ class GtMeshWidgetOps:
             locator, episode=str(msgs_dict["episode_number"])
         )
         target_id = target["primary_target_object"]
-        target_rot = target["primary_target_rotation_euler"]
+        target_rot = target["primary_target_rotation_quat"]
         target_pos = target["primary_target_position"]
-        widget = self.ycb_loader.create_mesh(target_id).clone(deep=True)
-        widget.rotate_x(target_rot[0])
-        widget.rotate_y(target_rot[1])
-        widget.rotate_z(target_rot[2])
+
+        try:
+            widget = self.ycb_loader.create_mesh(target_id).clone(deep=True)
+        except FileNotFoundError:
+            return widget, False
+
+        rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
+        rot_euler = rot.as_euler("xyz", degrees=True)
+        widget.rotate_x(rot_euler[0])
+        widget.rotate_y(rot_euler[1])
+        widget.rotate_z(rot_euler[2])
         widget.shift(*target_pos)
         widget.alpha(1.0 - msgs_dict["transparency_value"])
 
@@ -790,13 +798,15 @@ class HypSpaceWidgetOps:
             locator = self._locators["target"]
             target = self.data_parser.extract(locator, episode=str(episode_number))
             target_id = target["primary_target_object"]
-            target_rot = target["primary_target_rotation_euler"]
+            target_rot = target["primary_target_rotation_quat"]
             target_pos = target["primary_target_position"]
-
             widget = self.models_loader.create_model(target_id).clone(deep=True)
-            widget.rotate_x(target_rot[0])
-            widget.rotate_y(target_rot[1])
-            widget.rotate_z(target_rot[2])
+
+            rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
+            rot_euler = rot.as_euler("xyz", degrees=True)
+            widget.rotate_x(rot_euler[0])
+            widget.rotate_y(rot_euler[1])
+            widget.rotate_z(rot_euler[2])
 
             self.plotter.at(2).add(widget)
 
