@@ -468,7 +468,7 @@ class StepSliderWidgetOps:
                 DataLocatorStep.key(name="episode"),
                 DataLocatorStep.key(name="lm", value="LM_0"),
                 DataLocatorStep.key(
-                    name="telemetry", value="hypotheses_updater_telemetry"
+                    name="telemetry", value="time"
                 ),
                 DataLocatorStep.index(name="step"),
             ]
