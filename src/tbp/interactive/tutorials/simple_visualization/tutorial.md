@@ -743,6 +743,8 @@ class GtMeshWidgetOps:
             self.plotter.at(1).add(self.gaze_line)
         self.gaze_line.points = [sensor_pos, patch_pos]
 
+        self.updaters[1].expire_topic("step_number")
+
         # Display-only widget, so do not publish
         return widget, False
 ```
@@ -882,6 +884,8 @@ class MlhMeshWidgetOps:
 
         self.sensor_circle = Sphere(pos=mlh_pos, r=0.01).c("green")
         self.plotter.at(2).add(self.sensor_circle)
+
+        self.updaters[0].expire_topic("step_number")
 
         return widget, False
 ```
