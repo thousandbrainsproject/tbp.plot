@@ -468,7 +468,7 @@ class StepSliderWidgetOps:
                 DataLocatorStep.key(name="episode"),
                 DataLocatorStep.key(name="lm", value="LM_0"),
                 DataLocatorStep.key(
-                    name="telemetry", value="hypotheses_updater_telemetry"
+                    name="telemetry", value="time"
                 ),
                 DataLocatorStep.index(name="step"),
             ]
@@ -505,7 +505,6 @@ class StepSliderWidgetOps:
         ]
 
         self.set_state(widget, 0)
-        self.plotter.at(0).render()
 
         return widget, True
 ```
@@ -549,6 +548,7 @@ We first extend the imports because this widget renders meshes and uses a few ad
 ```python
 import numpy as np
 from vedo import Sphere, Line, Mesh, Sphere, Text2D
+from scipy.spatial.transform import Rotation
 ```
 
 
@@ -682,7 +682,6 @@ class GtMeshWidgetOps:
     def remove(self, widget: Mesh) -> None:
         if widget is not None:
             self.plotter.at(1).remove(widget)
-            self.plotter.at(1).render()
 
     def update_mesh(self, widget: Mesh, msgs: list[TopicMessage]) -> tuple[Mesh, bool]:
         self.remove(widget)
@@ -692,7 +691,7 @@ class GtMeshWidgetOps:
             self._locators["target"], episode=str(msgs_dict["episode_number"])
         )
         target_id = target["primary_target_object"]
-        target_rot = target["primary_target_rotation_euler"]
+        target_rot = target["primary_target_rotation_quat"]
         target_pos = target["primary_target_position"]
 
         try:
@@ -700,13 +699,14 @@ class GtMeshWidgetOps:
         except FileNotFoundError:
             return widget, False
 
-        widget.rotate_x(target_rot[0])
-        widget.rotate_y(target_rot[1])
-        widget.rotate_z(target_rot[2])
+        rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
+        rot_euler = rot.as_euler("xyz", degrees=True)
+        widget.rotate_x(rot_euler[0])
+        widget.rotate_y(rot_euler[1])
+        widget.rotate_z(rot_euler[2])
         widget.shift(*target_pos)
 
         self.plotter.at(1).add(widget)
-        self.plotter.at(1).render()
 
         # Display-only widget, so do not publish
         return widget, False
@@ -743,7 +743,7 @@ class GtMeshWidgetOps:
             self.plotter.at(1).add(self.gaze_line)
         self.gaze_line.points = [sensor_pos, patch_pos]
 
-        self.plotter.at(1).render()
+        self.updaters[1].expire_topic("step_number")
 
         # Display-only widget, so do not publish
         return widget, False
@@ -873,9 +873,11 @@ class MlhMeshWidgetOps:
         except FileNotFoundError:
             return widget, False
 
-        widget.rotate_x(mlh_rot[0])
-        widget.rotate_y(mlh_rot[1])
-        widget.rotate_z(mlh_rot[2])
+        rot = Rotation.from_euler("xyz", np.array(mlh_rot), degrees=True).inv()
+        rot_euler = rot.as_euler("xyz", degrees=True)
+        widget.rotate_x(rot_euler[0])
+        widget.rotate_y(rot_euler[1])
+        widget.rotate_z(rot_euler[2])
         widget.shift(*self.default_object_position)
 
         self.plotter.at(2).add(widget)
@@ -883,7 +885,7 @@ class MlhMeshWidgetOps:
         self.sensor_circle = Sphere(pos=mlh_pos, r=0.01).c("green")
         self.plotter.at(2).add(self.sensor_circle)
 
-        self.plotter.at(2).render()
+        self.updaters[0].expire_topic("step_number")
 
         return widget, False
 ```

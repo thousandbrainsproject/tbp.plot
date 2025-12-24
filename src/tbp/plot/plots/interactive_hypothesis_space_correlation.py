@@ -22,6 +22,7 @@ import seaborn as sns
 import vedo
 from pandas import DataFrame, Series
 from pubsub.core import Publisher
+from scipy.spatial.transform import Rotation
 from vedo import (
     Button,
     Circle,
@@ -526,12 +527,19 @@ class GtMeshWidgetOps:
             locator, episode=str(msgs_dict["episode_number"])
         )
         target_id = target["primary_target_object"]
-        target_rot = target["primary_target_rotation_euler"]
+        target_rot = target["primary_target_rotation_quat"]
         target_pos = target["primary_target_position"]
-        widget = self.ycb_loader.create_mesh(target_id).clone(deep=True)
-        widget.rotate_x(target_rot[0])
-        widget.rotate_y(target_rot[1])
-        widget.rotate_z(target_rot[2])
+
+        try:
+            widget = self.ycb_loader.create_mesh(target_id).clone(deep=True)
+        except FileNotFoundError:
+            return widget, False
+
+        rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
+        rot_euler = rot.as_euler("xyz", degrees=True)
+        widget.rotate_x(rot_euler[0])
+        widget.rotate_y(rot_euler[1])
+        widget.rotate_z(rot_euler[2])
         widget.shift(*target_pos)
         widget.alpha(1.0 - self.mesh_transparency)
 
@@ -2158,10 +2166,21 @@ class HypothesisMeshWidgetOps:
         hypothesis = msgs_dict["selected_hypothesis"]
 
         # Add object mesh
-        widget = self.ycb_loader.create_mesh(hypothesis["graph_id"]).clone(deep=True)
-        widget.rotate_x(hypothesis["Rot_x"])
-        widget.rotate_y(hypothesis["Rot_y"])
-        widget.rotate_z(hypothesis["Rot_z"])
+        try:
+            widget = self.ycb_loader.create_mesh(hypothesis["graph_id"]).clone(
+                deep=True
+            )
+        except FileNotFoundError:
+            return widget, False
+
+        hyp_rot = np.array(
+            [hypothesis["Rot_x"], hypothesis["Rot_y"], hypothesis["Rot_z"]]
+        )
+        rot = Rotation.from_euler("xyz", hyp_rot, degrees=True).inv()
+        rot_euler = rot.as_euler("xyz", degrees=True)
+        widget.rotate_x(rot_euler[0])
+        widget.rotate_y(rot_euler[1])
+        widget.rotate_z(rot_euler[2])
         widget.shift(self.default_object_position)
         widget.alpha(1.0 - self.mesh_transparency)
         self.plotter.at(2).add(widget)
