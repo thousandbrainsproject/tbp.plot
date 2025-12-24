@@ -882,7 +882,9 @@ class MlhMeshWidgetOps:
 
         self.plotter.at(2).add(widget)
 
-        self.sensor_circle = Sphere(pos=mlh_pos, r=0.01).c("green")
+        rotation_pivot = np.array(self.default_object_position)
+        mlh_pos_rotated = rotation_pivot + rot.apply(mlh_pos - rotation_pivot)
+        self.sensor_circle = Sphere(pos=mlh_pos_rotated, r=0.01).c("green")
         self.plotter.at(2).add(self.sensor_circle)
 
         self.updaters[0].expire_topic("step_number")
