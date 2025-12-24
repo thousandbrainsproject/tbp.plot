@@ -505,7 +505,6 @@ class StepSliderWidgetOps:
         ]
 
         self.set_state(widget, 0)
-        self.plotter.at(0).render()
 
         return widget, True
 ```
@@ -683,7 +682,6 @@ class GtMeshWidgetOps:
     def remove(self, widget: Mesh) -> None:
         if widget is not None:
             self.plotter.at(1).remove(widget)
-            self.plotter.at(1).render()
 
     def update_mesh(self, widget: Mesh, msgs: list[TopicMessage]) -> tuple[Mesh, bool]:
         self.remove(widget)
@@ -709,7 +707,6 @@ class GtMeshWidgetOps:
         widget.shift(*target_pos)
 
         self.plotter.at(1).add(widget)
-        self.plotter.at(1).render()
 
         # Display-only widget, so do not publish
         return widget, False
@@ -745,8 +742,6 @@ class GtMeshWidgetOps:
             self.gaze_line = Line(sensor_pos, patch_pos, c="black", lw=2)
             self.plotter.at(1).add(self.gaze_line)
         self.gaze_line.points = [sensor_pos, patch_pos]
-
-        self.plotter.at(1).render()
 
         # Display-only widget, so do not publish
         return widget, False
@@ -887,8 +882,6 @@ class MlhMeshWidgetOps:
 
         self.sensor_circle = Sphere(pos=mlh_pos, r=0.01).c("green")
         self.plotter.at(2).add(self.sensor_circle)
-
-        self.plotter.at(2).render()
 
         return widget, False
 ```
