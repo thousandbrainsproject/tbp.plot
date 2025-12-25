@@ -18,6 +18,49 @@ The animation below shows the final interactive plot we will build in this tutor
 
 ![Final interactive plot](assets/interactive_tutorial_final.gif)
 
+### Generate a Detailed JSON Log for This Tutorial
+
+This tutorial expects an experiment run that produced detailed JSON logs.
+The easiest way to generate a small, fast-to-load log is to run a short `tbp.monty` experiment with only a few episodes and enable the detailed logging config.
+
+If you have `tbp.monty` installed, run the following command:
+```zsh
+python run_parallel.py \
+  experiment=randrot_noise_10distinctobj_dist_agent \
+  episodes=\'5,9,12\' \
+  +experiment/config/logging=detailed_evidence_lm
+```
+
+This command:
+- runs the `randrot_noise_10distinctobj_dist_agent` experiment.
+- restricts the run to only three episodes:
+    - 5 (mustard bottle)
+    - 9 (banana)
+    - 12 (potted meat can)
+- overrides the experiment logging config to `detailed_evidence_lm`, which enables the detailed JSON logging handler.
+
+The experiment writes its outputs into the configured logging output directory.
+If you are using the `detailed_evidence_lm` config shown earlier, the [output directory](https://github.com/thousandbrainsproject/tbp.monty/blob/e7006fab6d05b8424b530eeefc8e4132bdddb8ab/conf/experiment/config/logging/detailed_evidence_lm.yaml?plain=1#L10) will be at:
+```yaml
+output_dir: ${oc.env:MONTY_LOGS}/projects/evidence_eval_runs/logs
+```
+
+After the run finishes, look inside the newly created run folder under that directory.
+You should see a `detailed_run_stats.json` log file produced by the detailed JSON handler.
+This tutorial’s plotting command expects you to pass the experiment log directory (the folder that contains the detailed JSON stats file) as the first argument when launching the plot.
+
+```zsh
+uv run plot interactive_tutorial /path/to/experiment/logs/dir
+```
+
+#### Optional: Download Pre-Generated Logs
+
+If you prefer not to run the experiment locally, you can download the resulting logs: [randrot_noise_10distinctobj_dist_agent.zip](https://tbp-pretrained-models-public-c9c24aef2e49b897.s3.us-east-2.amazonaws.com/tbp.plot/randrot_noise_10distinctobj_dist_agent.zip)
+
+Once downloaded and extracted, use the extracted directory as your `experiment_log_dir` when running:
+```zsh
+uv run plot interactive_tutorial /path/to/extracted/experiment/logs/dir
+```
 
 ---
 
