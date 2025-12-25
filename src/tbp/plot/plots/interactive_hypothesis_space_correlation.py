@@ -54,6 +54,7 @@ from tbp.interactive.utils import (
     CoordinateMapper,
     Location2D,
     Location3D,
+    rotate_about_pivot,
     trace_hypothesis_backward,
     trace_hypothesis_forward,
 )
@@ -84,6 +85,8 @@ COLOR_PALETTE = {
 
 FONT = "Arial"
 FONT_SIZE = 30
+
+_DEFAULT_PIVOT = np.array([0.0, 1.5, 0.0], dtype=float)
 
 
 class EpisodeSliderWidgetOps:
@@ -2176,7 +2179,7 @@ class HypothesisMeshWidgetOps:
         hyp_rot = np.array(
             [hypothesis["Rot_x"], hypothesis["Rot_y"], hypothesis["Rot_z"]]
         )
-        rot = Rotation.from_euler("xyz", hyp_rot, degrees=True).inv()
+        rot = Rotation.from_euler("xyz", hyp_rot, degrees=True)
         rot_euler = rot.as_euler("xyz", degrees=True)
         widget.rotate_x(rot_euler[0])
         widget.rotate_y(rot_euler[1])
@@ -2187,7 +2190,12 @@ class HypothesisMeshWidgetOps:
 
         # Add sphere for sensor's hypothesized location
         sensor_pos = (hypothesis["Loc_x"], hypothesis["Loc_y"], hypothesis["Loc_z"])
-        self.sensor_sphere = Sphere(pos=sensor_pos, r=0.003).c(COLOR_PALETTE["Primary"])
+        sensor_pos_rotated = rotate_about_pivot(
+            rotation=rot, points=sensor_pos, pivot=_DEFAULT_PIVOT
+        )
+        self.sensor_sphere = Sphere(pos=sensor_pos_rotated, r=0.003).c(
+            COLOR_PALETTE["Primary"]
+        )
         self.plotter.at(2).add(self.sensor_sphere)
 
         self.updaters[1].expire_topic("selected_hypothesis")
@@ -2257,15 +2265,24 @@ class HypothesisMeshWidgetOps:
         idx_list = df.index[mask_current].tolist()
         current_idx = idx_list[0]
 
+        hyp_rot = np.array([hyp["Rot_x"], hyp["Rot_y"], hyp["Rot_z"]])
+        rot = Rotation.from_euler("xyz", hyp_rot, degrees=True)
+
         if self.show_past_path:
             past_pts = df.loc[:current_idx, ["Loc_x", "Loc_y", "Loc_z"]].to_numpy()
-            self._build_path_geometry(past_pts, past=True)
+            past_pts_rotated = rotate_about_pivot(
+                rotation=rot, points=past_pts, pivot=_DEFAULT_PIVOT
+            )
+            self._build_path_geometry(past_pts_rotated, past=True)
 
         if self.show_future_path and current_idx < len(df) - 1:
             future_pts = df.loc[
                 current_idx + 1 :, ["Loc_x", "Loc_y", "Loc_z"]
             ].to_numpy()
-            self._build_path_geometry(future_pts, past=False)
+            future_pts_rotated = rotate_about_pivot(
+                rotation=rot, points=future_pts, pivot=_DEFAULT_PIVOT
+            )
+            self._build_path_geometry(future_pts_rotated, past=False)
 
     def _build_path_geometry(self, points: np.ndarray, past: bool) -> None:
         if points.size == 0:

@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
+from scipy.spatial.transform import Rotation
 from vedo.vtkclasses import vtkRenderWindowInteractor
 
 if TYPE_CHECKING:
@@ -380,3 +381,39 @@ def trace_hypothesis_forward(ix: int, removed_ids: Iterable[int]) -> int | None:
     if pos < len(removed_ids) and removed_ids[pos] == ix:
         return None
     return ix - pos
+
+
+def rotate_about_pivot(
+    rotation: Rotation,
+    points: npt.NDArray[np.float64],
+    pivot: npt.NDArray[np.float64],
+) -> np.ndarray:
+    """Rotate 3D point(s) about a fixed pivot.
+
+    Applies an active rotation around a specified pivot point. The rotation
+    is performed by translating the points so that the pivot is at the origin,
+    applying the rotation, then translating back.
+
+    p_rot = pivot + R @ (p - pivot)
+
+    Args:
+        rotation: A SciPy Rotation object representing the rotation to apply.
+        points: A single 3D point with shape (3,) or an array of points with
+            shape (N, 3).
+        pivot: The pivot point to rotate about, with shape (3,).
+
+    Returns:
+        A NumPy array of rotated point(s) with the same shape as `points`.
+
+    Raises:
+        ValueError: If `points` does not have shape (3,) or (N, 3).
+    """
+    points = np.asarray(points, dtype=float)
+    pivot = np.asarray(pivot, dtype=float)
+
+    if (points.shape == (3,)) or (points.ndim == 2 and points.shape[1] == 3):
+        return pivot + rotation.apply(points - pivot)
+
+    raise ValueError(
+        f"`points` must have shape (3,) or (N, 3); got shape {points.shape}"
+    )
