@@ -724,7 +724,7 @@ class GtMeshWidgetOps:
         sensor_pos = self.data_parser.extract(
             self._locators["sensor_location"],
             episode=str(episode_number),
-            sm_step=int(mapping[step_number]),
+            sm_step=max(0, int(mapping[step_number]) - 1),
         )
 
         patch_pos = self.data_parser.extract(
