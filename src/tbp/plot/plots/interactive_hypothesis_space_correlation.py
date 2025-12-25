@@ -86,6 +86,8 @@ COLOR_PALETTE = {
 FONT = "Arial"
 FONT_SIZE = 30
 
+_DEFAULT_PIVOT = np.array([0.0, 1.5, 0.0], dtype=float)
+
 
 class EpisodeSliderWidgetOps:
     """WidgetOps implementation for an Episode slider.
@@ -2188,7 +2190,9 @@ class HypothesisMeshWidgetOps:
 
         # Add sphere for sensor's hypothesized location
         sensor_pos = (hypothesis["Loc_x"], hypothesis["Loc_y"], hypothesis["Loc_z"])
-        sensor_pos_rotated = rotate_about_pivot(rot, sensor_pos)
+        sensor_pos_rotated = rotate_about_pivot(
+            rotation=rot, points=sensor_pos, pivot=_DEFAULT_PIVOT
+        )
         self.sensor_sphere = Sphere(pos=sensor_pos_rotated, r=0.003).c(
             COLOR_PALETTE["Primary"]
         )
@@ -2266,14 +2270,18 @@ class HypothesisMeshWidgetOps:
 
         if self.show_past_path:
             past_pts = df.loc[:current_idx, ["Loc_x", "Loc_y", "Loc_z"]].to_numpy()
-            past_pts_rotated = rotate_about_pivot(rot, past_pts)
+            past_pts_rotated = rotate_about_pivot(
+                rotation=rot, points=past_pts, pivot=_DEFAULT_PIVOT
+            )
             self._build_path_geometry(past_pts_rotated, past=True)
 
         if self.show_future_path and current_idx < len(df) - 1:
             future_pts = df.loc[
                 current_idx + 1 :, ["Loc_x", "Loc_y", "Loc_z"]
             ].to_numpy()
-            future_pts_rotated = rotate_about_pivot(rot, future_pts)
+            future_pts_rotated = rotate_about_pivot(
+                rotation=rot, points=future_pts, pivot=_DEFAULT_PIVOT
+            )
             self._build_path_geometry(future_pts_rotated, past=False)
 
     def _build_path_geometry(self, points: np.ndarray, past: bool) -> None:

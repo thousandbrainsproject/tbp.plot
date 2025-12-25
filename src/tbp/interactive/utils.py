@@ -23,8 +23,6 @@ from vedo.vtkclasses import vtkRenderWindowInteractor
 if TYPE_CHECKING:
     from collections.abc import Callable, Hashable, Iterable
 
-_DEFAULT_PIVOT = np.array([0.0, 1.5, 0.0], dtype=float)
-
 
 @dataclass
 class Location2D:
@@ -386,9 +384,9 @@ def trace_hypothesis_forward(ix: int, removed_ids: Iterable[int]) -> int | None:
 
 
 def rotate_about_pivot(
-    rot: Rotation,
+    rotation: Rotation,
     points: npt.NDArray[np.float64],
-    pivot: npt.NDArray[np.float64] = _DEFAULT_PIVOT,
+    pivot: npt.NDArray[np.float64],
 ) -> np.ndarray:
     """Rotate 3D point(s) about a fixed pivot.
 
@@ -399,11 +397,10 @@ def rotate_about_pivot(
     p_rot = pivot + R @ (p - pivot)
 
     Args:
-        rot: A SciPy Rotation object representing the rotation to apply.
+        rotation: A SciPy Rotation object representing the rotation to apply.
         points: A single 3D point with shape (3,) or an array of points with
             shape (N, 3).
-        pivot: The pivot point to rotate about, with shape (3,). Defaults to
-            [0.0, 1.5, 0.0].
+        pivot: The pivot point to rotate about, with shape (3,).
 
     Returns:
         A NumPy array of rotated point(s) with the same shape as `points`.
@@ -415,7 +412,7 @@ def rotate_about_pivot(
     pivot = np.asarray(pivot, dtype=float)
 
     if (points.shape == (3,)) or (points.ndim == 2 and points.shape[1] == 3):
-        return pivot + rot.apply(points - pivot)
+        return pivot + rotation.apply(points - pivot)
 
     raise ValueError(
         f"`points` must have shape (3,) or (N, 3); got shape {points.shape}"
