@@ -5,6 +5,7 @@ This is a visualization tool for plotting [tbp.monty](https://github.com/thousan
 - [Gallery](#gallery)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Tutorials](#tutorials)
 - [Contributions](#contributions)
 
 
@@ -95,6 +96,19 @@ options:
                         The name of the learning module (default: "LM_0").
 
 ```
+
+## Tutorials
+
+If you’re new to `tbp.plot` or want to understand how the visualizations are built, we provide a set of step-by-step tutorials.
+These walk through how to generate experiment logs, query them, and progressively construct interactive plots using the widget and pub/sub architecture.
+
+- **Getting Started with `DataParser` and `DataLocator`:** An introduction to querying and extracting data from `tbp.monty` experiment logs, which is the foundation for most plots.
+
+    See [`tutorials/data_parser/tutorial.md`](src/tbp/interactive/tutorials/data_parser/tutorial.md)
+
+- **Building a Simple Interactive Plot Step by Step:** Learn how to go from raw experiment logs to a fully interactive visualization, starting with an empty scene and adding widgets incrementally.
+
+    See: [`tutorials/simple_visualization/tutorial.md`](src/tbp/interactive/tutorials/simple_visualization/tutorial.md)
 
 
 ## Contributions
