@@ -33,7 +33,7 @@ python run_parallel.py \
 
 This command:
 - runs the `randrot_noise_10distinctobj_dist_agent` experiment.
-- restricts the run to only three episodes:
+- restricts the run to only three episodes, associated with the following objects:
     - 5 (mustard bottle)
     - 9 (banana)
     - 12 (potted meat can)
