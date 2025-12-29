@@ -1993,22 +1993,23 @@ class HypothesisMeshWidgetOps:
             steps=[DataLocatorStep.key(name="stat", value="hypotheses_updater")]
         )
 
+        locators["patch_location"] = DataLocator(
+            path=[
+                DataLocatorStep.key(name="episode"),
+                DataLocatorStep.key(name="system", value="LM_0"),
+                DataLocatorStep.key(name="telemetry", value="locations"),
+                DataLocatorStep.key(name="sm", value="patch"),
+                DataLocatorStep.index(name="step"),
+            ]
+        )
+
         return locators
 
-    def _extract_channel_data(
-        self, episode: str, step: int, obj: str
-    ) -> dict[str, Iterable]:
-        channel_data = self.data_parser.extract(
-            self._locators["channel"], episode=episode, step=step, obj=obj
+    def _extract_sensor_data(self, episode: str, step: int) -> list[float]:
+        patch_location = self.data_parser.extract(
+            self._locators["patch_location"], episode=episode, step=step
         )
-        updater_data = self.data_parser.extract(
-            self._locators["updater"], episode=episode, step=step, obj=obj
-        )
-        return {
-            "locations": channel_data["locations"],
-            "evidence": channel_data["evidence"],
-            "evidence_slopes": updater_data["evidence_slopes"],
-        }
+        return patch_location
 
     def _extract_ids_at_step(
         self, episode: str, step: int, obj: str
@@ -2057,14 +2058,14 @@ class HypothesisMeshWidgetOps:
         self, episode: str, step: int, obj: str, ix: int
     ) -> DataFrame:
         # Current row
-        row_data = self._extract_channel_data(episode, step, obj)
+        patch_location = self._extract_sensor_data(episode, step)
         rows: list[dict] = [
             {
                 "Episode": int(episode),
                 "Step": int(step),
-                "Loc_x": row_data["locations"][ix][0],
-                "Loc_y": row_data["locations"][ix][1],
-                "Loc_z": row_data["locations"][ix][2],
+                "Loc_x": patch_location[0],
+                "Loc_y": patch_location[1],
+                "Loc_z": patch_location[2],
             }
         ]
 
@@ -2084,14 +2085,14 @@ class HypothesisMeshWidgetOps:
                 break
 
             episode_b, step_b, idx_b = episode_prev, step_prev, idx_prev
-            row_data = self._extract_channel_data(episode_b, step_b, obj)
+            patch_location = self._extract_sensor_data(episode_b, step_b)
             rows_back.append(
                 {
                     "Episode": int(episode_b),
                     "Step": int(step_b),
-                    "Loc_x": row_data["locations"][idx_b][0],
-                    "Loc_y": row_data["locations"][idx_b][1],
-                    "Loc_z": row_data["locations"][idx_b][2],
+                    "Loc_x": patch_location[0],
+                    "Loc_y": patch_location[1],
+                    "Loc_z": patch_location[2],
                 }
             )
 
@@ -2109,14 +2110,14 @@ class HypothesisMeshWidgetOps:
                 break
 
             episode_f, step_f, idx_f = episode_next, step_next, idx_next
-            row_data = self._extract_channel_data(episode_f, step_f, obj)
+            patch_location = self._extract_sensor_data(episode_b, step_b)
             rows_forward.append(
                 {
                     "Episode": int(episode_f),
                     "Step": int(step_f),
-                    "Loc_x": row_data["locations"][idx_f][0],
-                    "Loc_y": row_data["locations"][idx_f][1],
-                    "Loc_z": row_data["locations"][idx_f][2],
+                    "Loc_x": patch_location[0],
+                    "Loc_y": patch_location[1],
+                    "Loc_z": patch_location[2],
                 }
             )
 
@@ -2176,26 +2177,33 @@ class HypothesisMeshWidgetOps:
         except FileNotFoundError:
             return widget, False
 
+        hyp_loc = np.array(
+            [hypothesis["Loc_x"], hypothesis["Loc_y"], hypothesis["Loc_z"]]
+        )
+        sensor_pos = self._extract_sensor_data(
+            str(hypothesis["episode"]), int(hypothesis["step"])
+        )
         hyp_rot = np.array(
             [hypothesis["Rot_x"], hypothesis["Rot_y"], hypothesis["Rot_z"]]
         )
+
+        # Rotate object to world coordinates
         rot = Rotation.from_euler("xyz", hyp_rot, degrees=True)
         rot_euler = rot.as_euler("xyz", degrees=True)
         widget.rotate_x(rot_euler[0])
         widget.rotate_y(rot_euler[1])
         widget.rotate_z(rot_euler[2])
-        widget.shift(self.default_object_position)
+
+        # Translate hypothesis location to sensor location
+        hyp_loc_world_coord = rotate_about_pivot(rot, hyp_loc, _DEFAULT_PIVOT)
+        widget.shift(self.default_object_position + (sensor_pos - hyp_loc_world_coord))
+
+        # Adjust transparency
         widget.alpha(1.0 - self.mesh_transparency)
         self.plotter.at(2).add(widget)
 
         # Add sphere for sensor's hypothesized location
-        sensor_pos = (hypothesis["Loc_x"], hypothesis["Loc_y"], hypothesis["Loc_z"])
-        sensor_pos_rotated = rotate_about_pivot(
-            rotation=rot, points=sensor_pos, pivot=_DEFAULT_PIVOT
-        )
-        self.sensor_sphere = Sphere(pos=sensor_pos_rotated, r=0.003).c(
-            COLOR_PALETTE["Primary"]
-        )
+        self.sensor_sphere = Sphere(pos=sensor_pos, r=0.003).c(COLOR_PALETTE["Primary"])
         self.plotter.at(2).add(self.sensor_sphere)
 
         self.updaters[1].expire_topic("selected_hypothesis")
@@ -2265,24 +2273,15 @@ class HypothesisMeshWidgetOps:
         idx_list = df.index[mask_current].tolist()
         current_idx = idx_list[0]
 
-        hyp_rot = np.array([hyp["Rot_x"], hyp["Rot_y"], hyp["Rot_z"]])
-        rot = Rotation.from_euler("xyz", hyp_rot, degrees=True)
-
         if self.show_past_path:
             past_pts = df.loc[:current_idx, ["Loc_x", "Loc_y", "Loc_z"]].to_numpy()
-            past_pts_rotated = rotate_about_pivot(
-                rotation=rot, points=past_pts, pivot=_DEFAULT_PIVOT
-            )
-            self._build_path_geometry(past_pts_rotated, past=True)
+            self._build_path_geometry(past_pts, past=True)
 
         if self.show_future_path and current_idx < len(df) - 1:
             future_pts = df.loc[
                 current_idx + 1 :, ["Loc_x", "Loc_y", "Loc_z"]
             ].to_numpy()
-            future_pts_rotated = rotate_about_pivot(
-                rotation=rot, points=future_pts, pivot=_DEFAULT_PIVOT
-            )
-            self._build_path_geometry(future_pts_rotated, past=False)
+            self._build_path_geometry(future_pts, past=False)
 
     def _build_path_geometry(self, points: np.ndarray, past: bool) -> None:
         if points.size == 0:
