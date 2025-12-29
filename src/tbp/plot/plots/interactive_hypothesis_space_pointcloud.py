@@ -459,7 +459,7 @@ class GtMeshWidgetOps:
         agent_pos = self.data_parser.extract(
             self._locators["agent_location"],
             episode=str(episode_number),
-            sm_step=int(mapping[step_number]),
+            sm_step=max(0, int(mapping[step_number]) - 1),
         )
 
         patch_pos = self.data_parser.extract(
@@ -524,7 +524,7 @@ class GtMeshWidgetOps:
                 agent_pos = self.data_parser.extract(
                     self._locators["agent_location"],
                     episode=str(episode_number),
-                    sm_step=int(mapping[k]),
+                    sm_step=max(0, int(mapping[k]) - 1),
                 )
                 points.append(agent_pos)
 
