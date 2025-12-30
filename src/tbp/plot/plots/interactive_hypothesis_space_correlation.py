@@ -86,6 +86,7 @@ COLOR_PALETTE = {
 FONT = "Arial"
 FONT_SIZE = 30
 
+# This is the default mesh location for objects in the Habitat simulator
 _DEFAULT_PIVOT = np.array([0.0, 1.5, 0.0], dtype=float)
 
 
