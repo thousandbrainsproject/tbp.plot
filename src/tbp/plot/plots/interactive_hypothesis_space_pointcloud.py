@@ -856,13 +856,23 @@ class HypSpaceWidgetOps:
         hyp_color_button: str,
         hyp_scope_button: str,
     ) -> Points:
-        curr_object = self.data_parser.extract(
+        target = self.data_parser.extract(
             self._locators["target"], episode=str(episode_number)
-        )["primary_target_object"]
-        evidences, locations, pose_errors, ages, slopes = self._extract_obj_telemetry(
-            episode_number, step_number, curr_object
         )
+        target_id = target["primary_target_object"]
+        target_rot = target["primary_target_rotation_quat"]
+
+        evidences, locations, pose_errors, ages, slopes = self._extract_obj_telemetry(
+            episode_number, step_number, target_id
+        )
+
+        rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
+        rot_euler = rot.as_euler("xyz", degrees=True)
+
         pts = Points(np.array(locations), r=6, c=COLOR_PALETTE["Secondary"])
+        pts.rotate_x(rot_euler[0])
+        pts.rotate_y(rot_euler[1])
+        pts.rotate_z(rot_euler[2])
 
         if hyp_color_button == "Evidence":
             pts.cmap("viridis", evidences, vmin=0.0)

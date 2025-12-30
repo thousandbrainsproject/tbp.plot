@@ -841,10 +841,16 @@ def create_widgets(self):
 
 ### Implement `MlhMeshWidgetOps`
 
+
+We first import a helper function to perform rotation of location points around a specified pivot point
+
+```python
+from tbp.interactive.utils import rotate_about_pivot
+```
+
 Now we define the widget behavior.
 This widget has a single updater that requires both `episode_number` and `step_number`, because the MLH changes over time and depends on the step.
 Whenever either selection changes, we update the mesh and the MLH location marker.
-
 
 ```python
 class MlhMeshWidgetOps:
@@ -925,7 +931,9 @@ class MlhMeshWidgetOps:
 
         self.plotter.at(2).add(widget)
 
-        self.sensor_circle = Sphere(pos=mlh_pos, r=0.01).c("green")
+        rotation_pivot = np.array(self.default_object_position)
+        mlh_pos_rotated = rotate_about_pivot(rotation=rot, points=mlh_pos, pivot=rotation_pivot)
+        self.sensor_circle = Sphere(pos=mlh_pos_rotated, r=0.01).c("green")
         self.plotter.at(2).add(self.sensor_circle)
 
         self.updaters[0].expire_topic("step_number")
