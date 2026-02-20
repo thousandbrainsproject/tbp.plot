@@ -382,6 +382,25 @@ class DataParser:
         path = os.path.join(path, "detailed_run_stats.json")
         self.data = deserialize_json_chunks(path)
 
+    @classmethod
+    def from_dict(cls, data: Any) -> DataParser:
+        """Construct a DataParser directly from already-loaded JSON-like dict data.
+
+        This bypasses file I/O and is useful for tests or when the caller already
+        has the parsed structure.
+
+        Args:
+            data: A JSON-like object (typically dict/list nesting).
+
+        Returns:
+            A DataParser instance whose `.data` is set to `data`.
+        """
+        # bypass __init__
+        self = cls.__new__(cls)
+
+        self.data = data
+        return self
+
     def extract(self, locator: DataLocator, **kwargs: Any) -> Any:
         """Extract a value by following a `DataLocator` path.
 
