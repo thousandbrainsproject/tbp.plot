@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
+import numpy.typing as npt
 import torch
 import trimesh
 from vedo import Mesh, Points
@@ -333,3 +334,226 @@ class DataLocator:
             for step in self.path
         )
         return f"Path: root{steps}"
+
+
+class HierarchyStepMapper:
+    """Bidirectional step index mapper for hierarchical LM experiments.
+
+    Converts step indices between 'agent' and LM levels ('LM_0', 'LM_1', etc.) using
+    the agent level as an anchor.
+
+    Attributes:
+        data_parser: The DataParser instance for extracting data.
+        episode: The episode number as string.
+    """
+
+    AGENT_LEVEL = "agent"
+
+    def __init__(self, data_parser: DataParser, episode: str) -> None:
+        """Initialize the mapper for a specific episode.
+
+        Args:
+            data_parser: A DataParser instance with loaded experiment data.
+            episode: The episode identifier (e.g., "0", "1").
+        """
+        self.data_parser = data_parser
+        self.episode = episode
+
+        self._locators = self._create_locators()
+
+        self._masks: dict[str, npt.NDArray[np.int_]] = {}
+        self._reverse_maps: dict[str, dict[int, int]] = {}
+        self._num_agent_steps: int = 0
+        self._available_lm_levels: list[str] = []
+
+        self._load_all_lm_masks()
+
+    def _create_locators(self) -> dict[str, DataLocator]:
+        """Create data locators for accessing LM step masks.
+
+        Returns:
+            Dictionary of DataLocator instances keyed by name.
+        """
+        locators = {}
+        locators["steps_mask"] = DataLocator(
+            path=[
+                DataLocatorStep.key(name="episode"),
+                DataLocatorStep.key(name="lm"),
+                DataLocatorStep.key(name="telemetry", value="lm_processed_steps"),
+            ]
+        )
+
+        return locators
+
+    def _load_all_lm_masks(self) -> None:
+        """Discover all LMs and load their step masks.
+
+        Raises:
+            ValueError: If no LMs with lm_processed_steps are found.
+        """
+        available_lms = self.data_parser.query(
+            self._locators["steps_mask"],
+            episode=self.episode,
+        )
+
+        lm_names = [s for s in available_lms if s.startswith("LM_")]
+
+        if not lm_names:
+            raise ValueError(
+                f"No Learning Modules found in episode {self.episode}. "
+                f"Available: {available_lms}"
+            )
+
+        for lm_name in sorted(lm_names):
+            try:
+                mask = self.data_parser.extract(
+                    self._locators["steps_mask"],
+                    episode=self.episode,
+                    lm=lm_name,
+                )
+                mask = np.asarray(mask, dtype=bool)
+
+                agent_indices = np.flatnonzero(mask)
+
+                self._masks[lm_name] = agent_indices
+                self._reverse_maps[lm_name] = {
+                    int(agent_idx): lm_idx
+                    for lm_idx, agent_idx in enumerate(agent_indices)
+                }
+
+                if self._num_agent_steps == 0:
+                    self._num_agent_steps = len(mask)
+                elif self._num_agent_steps != len(mask):
+                    raise ValueError(
+                        f"Inconsistent mask lengths: {lm_name} has {len(mask)} "
+                        f"steps, expected {self._num_agent_steps}"
+                    )
+
+                self._available_lm_levels.append(lm_name)
+
+            except (KeyError, TypeError):
+                continue
+
+        if not self._masks:
+            raise ValueError(
+                f"No LMs with lm_processed_steps found in episode {self.episode}. "
+                f"Tried: {lm_names}"
+            )
+
+    def available_levels(self) -> list[str]:
+        """Return all available levels: ['agent', 'LM_0', 'LM_1', ...]."""
+        return [self.AGENT_LEVEL] + sorted(self._available_lm_levels)
+
+    def num_steps(self, level: str) -> int:
+        """Return the number of steps at a given level.
+
+        Args:
+            level: The level name ('agent', 'LM_0', 'LM_1', etc.).
+
+        Returns:
+            Number of steps at that level.
+
+        Raises:
+            ValueError: If the level is not recognized.
+        """
+        if level == self.AGENT_LEVEL:
+            return self._num_agent_steps
+
+        if level not in self._masks:
+            raise ValueError(
+                f"Unknown level '{level}'. Available: {self.available_levels()}"
+            )
+
+        return len(self._masks[level])
+
+    def convert(
+        self,
+        step: int,
+        from_level: str,
+        to_level: str,
+    ) -> int | None:
+        """Convert a step index from one level to another.
+
+        Cross-LM conversions go through agent: LM_0 -> agent -> LM_1.
+
+        Args:
+            step: The step index at the source level (0-indexed).
+            from_level: Source level name.
+            to_level: Target level name.
+
+        Returns:
+            The corresponding step index, or None if the step does not
+            exist at the target level.
+
+        Raises:
+            ValueError: If either level is not recognized or step is out of range.
+        """
+        self._validate_level(from_level)
+        self._validate_level(to_level)
+
+        num_from_steps = self.num_steps(from_level)
+        if step < 0 or step >= num_from_steps:
+            raise ValueError(
+                f"Step {step} out of range for level '{from_level}' "
+                f"(valid: 0 to {num_from_steps - 1})"
+            )
+
+        if from_level == to_level:
+            return step
+
+        if from_level == self.AGENT_LEVEL:
+            agent_step = step
+        else:
+            agent_step = int(self._masks[from_level][step])
+
+        if to_level == self.AGENT_LEVEL:
+            return agent_step
+        else:
+            return self._reverse_maps[to_level].get(agent_step, None)
+
+    def _validate_level(self, level: str) -> None:
+        """Validate that a level name is recognized.
+
+        Raises:
+            ValueError: If the level is not recognized.
+        """
+        if level != self.AGENT_LEVEL and level not in self._masks:
+            raise ValueError(
+                f"Unknown level '{level}'. Available: {self.available_levels()}"
+            )
+
+    def get_agent_indices(self, level: str) -> npt.NDArray[np.int_]:
+        """Get the array of agent-level indices for a given LM level.
+
+        Args:
+            level: The LM level name (e.g., 'LM_0', 'LM_1').
+
+        Returns:
+            Array of agent step indices where this LM processed data.
+
+        Raises:
+            ValueError: If level is 'agent' or not recognized.
+        """
+        if level == self.AGENT_LEVEL:
+            raise ValueError(
+                "Cannot get agent indices for 'agent' level. "
+                "Use range(num_steps('agent')) instead."
+            )
+
+        if level not in self._masks:
+            raise ValueError(
+                f"Unknown level '{level}'. Available LMs: {self._available_lm_levels}"
+            )
+
+        return self._masks[level].copy()
+
+    def get_union_agent_indices(self) -> npt.NDArray[np.int_]:
+        """Get sorted agent indices where at least one LM processed.
+
+        Returns:
+            Sorted array of unique agent step indices.
+        """
+        all_indices: set[int] = set()
+        for level in self._available_lm_levels:
+            all_indices.update(self._masks[level].tolist())
+        return np.array(sorted(all_indices))
