@@ -8,6 +8,7 @@
 # https://opensource.org/licenses/MIT.
 from __future__ import annotations
 
+import colorsys
 import os
 import pickle
 import types
@@ -21,6 +22,7 @@ import torch
 import trimesh
 from vedo import Mesh, Points
 
+from tbp.interactive.colors import Palette, hex_to_rgb
 from tbp.plot.plots.stats import deserialize_json_chunks
 
 if TYPE_CHECKING:
@@ -142,19 +144,45 @@ class _MontyShimUnpickler(pickle.Unpickler):
 class PretrainedModelsLoader:
     """Load Monty pretrained Models as point cloud Vedo object."""
 
-    def __init__(self, data_path: str, lm_id: int = 0, input_channel: str = "patch"):
+    def __init__(self, data_path: str):
         """Initialize the loader.
 
         Args:
             data_path: Path to the `model.pt` file holding the pretrained models.
-            lm_id: Which learning module to use when extracting the pretrained graphs.
-            input_channel: Which channel to use for extracting the pretrained graphs.
         """
-        self.path = data_path
-        models = self._torch_load_with_optional_shim()["lm_dict"][lm_id]["graph_memory"]
-        self.graphs = {k: v[input_channel]._graph for k, v in models.items()}
+        models = self._torch_load_with_optional_shim(data_path)
+        self.data_parser = DataParser.from_dict(models)
+        self.locators = {
+            "graph": DataLocator(
+                path=[
+                    DataLocatorStep.key(name="system", value="lm_dict"),
+                    DataLocatorStep.index(name="lm_id"),
+                    DataLocatorStep.key(name="telemetry", value="graph_memory"),
+                    DataLocatorStep.key(name="graph_id"),
+                    DataLocatorStep.key(name="input_channel"),
+                ],
+            )
+        }
 
-    def _torch_load_with_optional_shim(self, map_location="cpu"):
+        # Define palette colors for object_id coloring (primary + scientific notation)
+        self.object_id_palette = [
+            Palette.as_hex("numenta_blue"),
+            Palette.as_hex("pink"),
+            Palette.as_hex("purple"),
+            Palette.as_hex("green"),
+            Palette.as_hex("gold"),
+            Palette.as_hex("indigo"),
+        ]
+
+    def query(self, lm_id=None, graph_id=None, input_channel=None):
+        return self.data_parser.query(
+            self.locators["graph"],
+            lm_id=lm_id,
+            graph_id=graph_id,
+            input_channel=input_channel,
+        )
+
+    def _torch_load_with_optional_shim(self, data_path: str, map_location="cpu"):
         """Load a torch checkpoint with optional fallback for tbp.monty shimming.
 
         Try a standard torch.load first (weights_only=False because we need objects).
@@ -162,6 +190,7 @@ class PretrainedModelsLoader:
         retry using a restricted Unpickler that only dummies tbp.monty.* symbols.
 
         Args:
+            data_path: Path to the `model.pt` file holding the pretrained models.
             map_location: Device mapping passed to `torch.load` (default: "cpu").
 
         Returns:
@@ -171,7 +200,7 @@ class PretrainedModelsLoader:
             ModuleNotFoundError: If a missing module other than `tbp.monty` is required.
         """
         try:
-            return torch.load(self.path, map_location=map_location, weights_only=False)
+            return torch.load(data_path, map_location=map_location, weights_only=False)
         except ModuleNotFoundError as e:
             # Only intercept the specific missing tbp.monty namespace
             if "tbp.monty" not in str(e):
@@ -181,14 +210,159 @@ class PretrainedModelsLoader:
             shim_pickle_module.Unpickler = _MontyShimUnpickler
 
             return torch.load(
-                self.path,
+                data_path,
                 map_location=map_location,
                 weights_only=False,
                 pickle_module=shim_pickle_module,
             )
 
-    def create_model(self, obj_name: str) -> Points:
-        return Points(self.graphs[obj_name].pos.numpy(), r=4, c="gray")
+    def hsv_to_rgba(self, hsv: np.ndarray, alpha: int = 255) -> np.ndarray:
+        """Convert an array of HSV color values to RGBA.
+
+        Takes an (N, 3) array of HSV values where each row contains
+        (hue, saturation, value) floats normalized to [0, 1], and returns
+        an (N, 4) array of RGBA values as uint8 in [0, 255].
+
+        Args:
+            hsv: Array of shape (N, 3) containing HSV color values. Each
+                component (hue, saturation, value) should be a float in [0, 1].
+            alpha: Alpha (opacity) value to use for all output colors.
+                Defaults to 255 (fully opaque).
+
+        Returns:
+            Array of shape (N, 4) containing RGBA color values as uint8,
+            where RGB channels are converted from the input HSV and the
+            alpha channel is set to the provided `alpha` value.
+
+        Raises:
+            ValueError: If `hsv` is not a 2D array with exactly 3 columns.
+        """
+        hsv = np.asarray(hsv, dtype=float)
+        if hsv.ndim != 2 or hsv.shape[1] != 3:
+            raise ValueError(f"Expected (N,3), got {hsv.shape}")
+
+        rgb = np.empty((hsv.shape[0], 3), dtype=np.uint8)
+        for i, (h, s, v) in enumerate(hsv):
+            r, g, b = colorsys.hsv_to_rgb(float(h), float(s), float(v))  # -> 0..1
+            rgb[i] = (np.array([r, g, b]) * 255.0 + 0.5).astype(np.uint8)
+
+        rgba = np.concatenate(
+            [rgb, np.full((rgb.shape[0], 1), alpha, dtype=np.uint8)], axis=1
+        )
+        return rgba
+
+    @staticmethod
+    def graph_id_to_hash(graph_id: str) -> int:
+        """Convert a graph_id string to its hash value for object_id mapping.
+
+        This matches the hash function used when encoding graph_ids as object_ids
+        in the lower-level LM data.
+
+        Args:
+            graph_id: The string identifier for a graph.
+
+        Returns:
+            Integer hash computed as sum of ordinal values of characters.
+        """
+        return sum(ord(c) for c in graph_id)
+
+    def object_id_to_rgba(
+        self,
+        object_ids: np.ndarray,
+        alpha: int = 255,
+        lm_id: int | None = None,
+    ) -> tuple[np.ndarray, dict[str, tuple[str, str]]]:
+        """Convert object IDs to RGBA colors and optionally build a legend.
+
+        Maps each unique object ID to a color from the palette, cycling
+        through colors if there are more object IDs than available colors.
+        When lm_id is provided (and > 0), also builds a legend mapping
+        lower-level graph_ids to their colors.
+
+        Args:
+            object_ids: Array of shape (N,) or (N, 1) containing integer object IDs.
+            alpha: Alpha (opacity) value to use for all output colors.
+                Defaults to 255 (fully opaque).
+            lm_id: The LM level of the current graph. If provided and > 0,
+                queries the lower-level LM for graph_ids to build the legend.
+
+        Returns:
+            A tuple of (rgba, legend) where:
+            - rgba: Array of shape (N, 4) containing RGBA color values as uint8.
+            - legend: Dictionary mapping graph_id -> (hash_str, color_hex) for
+              each graph_id whose hash appears in object_ids. Empty dict if
+              lm_id is None or 0.
+        """
+        object_ids = np.asarray(object_ids).flatten().astype(int)
+        unique_ids = np.unique(object_ids)
+
+        # Create mapping from object_id to color index (cycling through palette)
+        id_to_color_idx = {
+            oid: i % len(self.object_id_palette) for i, oid in enumerate(unique_ids)
+        }
+
+        # Build RGBA array
+        rgba = np.empty((len(object_ids), 4), dtype=np.uint8)
+        for i, oid in enumerate(object_ids):
+            color_idx = id_to_color_idx[oid]
+            r, g, b = hex_to_rgb(self.object_id_palette[color_idx])
+            rgba[i] = (
+                int(r * 255),
+                int(g * 255),
+                int(b * 255),
+                alpha,
+            )
+
+        # Build legend if lm_id provided and > 0
+        legend: dict[str, tuple[str, str]] = {}
+        if lm_id is not None and lm_id > 0:
+            lower_graph_ids = self.query(lm_id=lm_id - 1)
+            reverse_hash = {self.graph_id_to_hash(gid): gid for gid in lower_graph_ids}
+
+            for oid in unique_ids:
+                if oid in reverse_hash:
+                    graph_id = reverse_hash[oid]
+                    color_hex = self.object_id_palette[id_to_color_idx[oid]]
+                    legend[graph_id] = (str(oid), color_hex)
+
+        return rgba, legend
+
+    def create_model(
+        self,
+        graph_id: str,
+        lm_id: int = 0,
+        input_channel: str = "patch",
+        color: bool = False,
+    ) -> Points:
+        graph = self.data_parser.extract(
+            self.locators["graph"],
+            lm_id=lm_id,
+            graph_id=graph_id,
+            input_channel=input_channel,
+        )
+        points = Points(graph._graph.pos, r=4, c="gray")
+
+        if color:
+            feature_mapping = graph._current_feature_mapping
+
+            if "hsv" in feature_mapping:
+                hsv = graph._graph.x[
+                    :,
+                    feature_mapping["hsv"][0] : feature_mapping["hsv"][1],
+                ]
+                rgba = self.hsv_to_rgba(hsv)
+                points.pointcolors = rgba
+            elif "object_id" in feature_mapping:
+                object_ids = graph._graph.x[
+                    :,
+                    feature_mapping["object_id"][0] : feature_mapping["object_id"][1],
+                ]
+                rgba, legend = self.object_id_to_rgba(object_ids, lm_id=lm_id)
+                points.pointcolors = rgba
+                if legend:
+                    points.legend_data = legend
+
+        return points
 
 
 class DataParser:
