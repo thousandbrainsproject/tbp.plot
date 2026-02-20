@@ -175,6 +175,34 @@ class BaseWithSampleData(unittest.TestCase):
         self.assertEqual((s1.type, s1.name, s1.value), ("key", "episode", "0"))
         self.assertEqual((s2.type, s2.name, s2.value), ("index", "step", 3))
 
+    def test_from_dict_creates_parser(self) -> None:
+        data = {"key": [1, 2, 3]}
+        parser = DataParser.from_dict(data)
+        self.assertIsInstance(parser, DataParser)
+        self.assertEqual(parser.data, data)
+
+    def test_from_dict_extract(self) -> None:
+        data = {"a": {"b": "value"}}
+        parser = DataParser.from_dict(data)
+        loc = DataLocator(
+            path=[
+                DataLocatorStep.key("first", "a"),
+                DataLocatorStep.key("second", "b"),
+            ]
+        )
+        self.assertEqual(parser.extract(loc), "value")
+
+    def test_from_dict_query(self) -> None:
+        data = {"a": {"x": 1, "y": 2}}
+        parser = DataParser.from_dict(data)
+        loc = DataLocator(
+            path=[
+                DataLocatorStep.key("first", "a"),
+                DataLocatorStep.key("second", None),
+            ]
+        )
+        self.assertEqual(sorted(parser.query(loc)), ["x", "y"])
+
     def tearDown(self) -> None:
         self.parser = None
         self.sample_data = None
