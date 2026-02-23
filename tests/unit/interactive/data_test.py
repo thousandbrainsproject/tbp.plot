@@ -16,8 +16,8 @@ from tbp.interactive.data import (
     DataLocator,
     DataLocatorStep,
     DataParser,
-    HierarchyStepMapper,
     EpisodeStepMapper,
+    HierarchyStepMapper,
 )
 
 
@@ -229,6 +229,10 @@ class FakeHierarchyDataParser(DataParser):
                     "lm_processed_steps": [0, 0, 0, 0, 1, 0, 1, 1],
                 },
                 "motor_system": {},
+            }
+        }
+
+
 class FakeEpisodeStepMapperDataParser(DataParser):
     """Parser with data shaped for EpisodeStepMapper: 3 episodes with 3, 2, 5 steps."""
 
@@ -410,6 +414,8 @@ class TestHierarchyStepMapper(unittest.TestCase):
     def tearDown(self) -> None:
         self.parser = None
         self.mapper = None
+
+
 class TestEpisodeStepMapper(unittest.TestCase):
     """Tests for the EpisodeStepMapper class.
 

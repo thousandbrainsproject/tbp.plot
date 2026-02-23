@@ -761,6 +761,8 @@ class HierarchyStepMapper:
         for level in self._available_lm_levels:
             all_indices.update(self._masks[level].tolist())
         return np.array(sorted(all_indices))
+
+
 class EpisodeStepMapper:
     """Bidirectional mapping between global step indices and (episode, local_step).
 

@@ -31,8 +31,8 @@ from tbp.interactive.data import (
     DataLocator,
     DataLocatorStep,
     DataParser,
-    PretrainedModelsLoader,
     EpisodeStepMapper,
+    PretrainedModelsLoader,
     YCBMeshLoader,
 )
 from tbp.interactive.topics import TopicMessage, TopicSpec
