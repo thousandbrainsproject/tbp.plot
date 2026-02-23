@@ -672,7 +672,9 @@ class HypSpaceWidgetOps:
             target_id = target["primary_target_object"]
             target_rot = target["primary_target_rotation_quat"]
             target_pos = target["primary_target_position"]
-            widget = self.models_loader.create_model(target_id).clone(deep=True)
+            widget = self.models_loader.create_model(graph_id=target_id).clone(
+                deep=True
+            )
 
             rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
             rot_euler = rot.as_euler("xyz", degrees=True)
