@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-import bisect
 import logging
 from copy import deepcopy
 from pathlib import Path
@@ -32,6 +31,7 @@ from tbp.interactive.data import (
     DataLocator,
     DataLocatorStep,
     DataParser,
+    EpisodeStepMapper,
     PretrainedModelsLoader,
     YCBMeshLoader,
 )
@@ -74,134 +74,6 @@ COLOR_PALETTE = {
 }
 
 
-class StepMapper:
-    """Bidirectional mapping between global step indices and (episode, local_step).
-
-    Global steps are defined as the concatenation of all local episode steps:
-
-        episode 0: steps [0, ..., n0 - 1]
-        episode 1: steps [0, ..., n1 - 1]
-        ...
-
-    Global index is:
-        [0, ..., n0 - 1, n0, ..., n0 + n1 - 1, ...]
-    """
-
-    def __init__(self, data_parser: DataParser) -> None:
-        self.data_parser = data_parser
-        self._locators = self._create_locators()
-
-        # number of steps in each episode
-        self._episode_lengths: list[int] = self._compute_episode_lengths()
-
-        # global offset of each episode
-        self._prefix_sums: list[int] = self._compute_prefix_sums()
-
-    def _create_locators(self) -> dict[str, DataLocator]:
-        """Create and return data locators used to access episode steps.
-
-        Returns:
-            A dictionary containing the created locators.
-        """
-        locators = {}
-        locators["step"] = DataLocator(
-            path=[
-                DataLocatorStep.key(name="episode"),
-                DataLocatorStep.key(name="lm", value="LM_0"),
-                DataLocatorStep.key(
-                    name="telemetry", value="hypotheses_updater_telemetry"
-                ),
-            ]
-        )
-        return locators
-
-    def _compute_episode_lengths(self) -> list[int]:
-        locator = self._locators["step"]
-
-        episode_lengths: list[int] = []
-
-        for episode in self.data_parser.query(locator):
-            episode_lengths.append(
-                len(self.data_parser.extract(locator, episode=episode))
-            )
-
-        if not episode_lengths:
-            raise RuntimeError("No episodes found while computing episode lengths.")
-
-        return episode_lengths
-
-    def _compute_prefix_sums(self) -> list[int]:
-        prefix_sums = [0]
-        for length in self._episode_lengths:
-            prefix_sums.append(prefix_sums[-1] + length)
-        return prefix_sums
-
-    @property
-    def num_episodes(self) -> int:
-        return len(self._episode_lengths)
-
-    @property
-    def total_num_steps(self) -> int:
-        """Total number of steps across all episodes."""
-        return self._prefix_sums[-1]
-
-    def global_to_local(self, global_step: int) -> tuple[int, int]:
-        """Convert a global step index into (episode, local_step).
-
-        Args:
-            global_step: Global step index in the range
-                `[0, total_num_steps)`.
-
-        Returns:
-            A pair `(episode, local_step)` such that:
-              * `episode` is the zero based episode index.
-              * `local_step` is the zero based step index within that episode.
-
-        Raises:
-            IndexError: If `global_step` is negative or not less than
-                `total_num_steps`.
-        """
-        if global_step < 0 or global_step >= self.total_num_steps:
-            raise IndexError(
-                f"global_step {global_step} is out of range [0, {self.total_num_steps})"
-            )
-
-        episode = bisect.bisect_right(self._prefix_sums, global_step) - 1
-        local_step = global_step - self._prefix_sums[episode]
-        return episode, local_step
-
-    def local_to_global(self, episode: int, step: int) -> int:
-        """Convert an (episode, local_step) pair into a global step index.
-
-        Args:
-            episode: Zero based episode index in the range
-                `[0, num_episodes)`.
-            step: Zero based step index within the given episode. Must be in
-                `[0, number_of_steps_in_episode)`.
-
-        Returns:
-            The corresponding global step index, in the range
-            `[0, total_num_steps)`.
-
-        Raises:
-            IndexError: If `episode` is out of range, or if `step` is out of
-                range for the given episode.
-        """
-        if episode < 0 or episode >= self.num_episodes:
-            raise IndexError(
-                f"episode {episode} is out of range [0, {self.num_episodes})"
-            )
-
-        num_steps_in_episode = self._episode_lengths[episode]
-        if step < 0 or step >= num_steps_in_episode:
-            raise IndexError(
-                f"step {step} is out of range [0, {num_steps_in_episode}) "
-                f"for episode {episode}"
-            )
-
-        return self._prefix_sums[episode] + step
-
-
 class StepSliderWidgetOps:
     """WidgetOps implementation for a Step slider.
 
@@ -226,7 +98,7 @@ class StepSliderWidgetOps:
         self,
         plotter: Plotter,
         data_parser: DataParser,
-        step_mapper: StepMapper,
+        step_mapper: EpisodeStepMapper,
     ) -> None:
         self.plotter = plotter
         self.data_parser = data_parser
@@ -800,7 +672,9 @@ class HypSpaceWidgetOps:
             target_id = target["primary_target_object"]
             target_rot = target["primary_target_rotation_quat"]
             target_pos = target["primary_target_position"]
-            widget = self.models_loader.create_model(target_id).clone(deep=True)
+            widget = self.models_loader.create_model(graph_id=target_id).clone(
+                deep=True
+            )
 
             rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
             rot_euler = rot.as_euler("xyz", degrees=True)
@@ -1077,7 +951,7 @@ class LinePlotWidgetOps:
         self,
         plotter: Plotter,
         data_parser: DataParser,
-        step_mapper: StepMapper,
+        step_mapper: EpisodeStepMapper,
     ):
         self.plotter = plotter
         self.data_parser = data_parser
@@ -1543,7 +1417,7 @@ class InteractivePlot:
         self.cam_dict = {"pos": (300, 200, 1500), "focal_point": (300, 200, 0)}
 
         self.data_parser = DataParser(exp_path)
-        self.step_mapper = StepMapper(self.data_parser)
+        self.step_mapper = EpisodeStepMapper(self.data_parser)
         self.ycb_loader = YCBMeshLoader(data_path)
         self.models_loader = PretrainedModelsLoader(models_path)
         self.event_bus = Publisher()
