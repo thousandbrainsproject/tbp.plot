@@ -215,6 +215,92 @@ class TestMakeSliderStepActions(unittest.TestCase):
             scheduler._on_timer(None, "TimerEvent")
         self.assertEqual(widget.values, [0.0, 0.5, 1.0])
 
+    def test_values_parameter_creates_actions_for_each_value(self) -> None:
+        widget = FakeWidget()
+        custom_values = [0.0, 0.3, 0.5, 0.8, 1.0]
+        actions = make_slider_step_actions_for_widget(
+            widget=widget,
+            values=custom_values,
+            step_dt=0.2,
+        )
+
+        self.assertEqual(len(actions), 5)
+        expected_times = [0.0, 0.2, 0.4, 0.6, 0.8]
+        for action, expected_time in zip(actions, expected_times, strict=True):
+            self.assertAlmostEqual(action.time, expected_time, places=7)
+
+        for a in actions:
+            a.func()
+
+        self.assertEqual(widget.values, custom_values)
+
+    def test_empty_values_list_returns_empty_actions(self) -> None:
+        widget = FakeWidget()
+        actions = make_slider_step_actions_for_widget(
+            widget=widget,
+            values=[],
+            step_dt=0.5,
+        )
+
+        self.assertEqual(actions, [])
+        self.assertEqual(widget.values, [])
+
+    def test_both_modes_raises_value_error(self) -> None:
+        widget = FakeWidget()
+
+        # Providing both 'values' and interpolation parameters should raise
+        with self.assertRaises(ValueError) as cm:
+            make_slider_step_actions_for_widget(
+                widget=widget,
+                start_value=0.0,
+                stop_value=1.0,
+                num_steps=5,
+                values=[0.0, 0.5, 1.0],
+                step_dt=0.5,
+            )
+        self.assertIn("Cannot specify both", str(cm.exception))
+
+        # Even partial interpolation params with values should raise
+        with self.assertRaises(ValueError) as cm:
+            make_slider_step_actions_for_widget(
+                widget=widget,
+                start_value=0.0,
+                values=[0.0, 0.5, 1.0],
+                step_dt=0.5,
+            )
+        self.assertIn("Cannot specify both", str(cm.exception))
+
+    def test_missing_parameters_raises_value_error(self) -> None:
+        widget = FakeWidget()
+
+        # Missing everything
+        with self.assertRaises(ValueError) as cm:
+            make_slider_step_actions_for_widget(
+                widget=widget,
+                step_dt=0.5,
+            )
+        self.assertIn("Either 'values' or all of", str(cm.exception))
+
+        # Missing num_steps
+        with self.assertRaises(ValueError) as cm:
+            make_slider_step_actions_for_widget(
+                widget=widget,
+                start_value=0.0,
+                stop_value=1.0,
+                step_dt=0.5,
+            )
+        self.assertIn("All of (start_value, stop_value, num_steps)", str(cm.exception))
+
+        # Missing stop_value
+        with self.assertRaises(ValueError) as cm:
+            make_slider_step_actions_for_widget(
+                widget=widget,
+                start_value=0.0,
+                num_steps=5,
+                step_dt=0.5,
+            )
+        self.assertIn("All of (start_value, stop_value, num_steps)", str(cm.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -109,40 +109,70 @@ class WidgetAnimator:
 def make_slider_step_actions_for_widget(
     *,
     widget,
-    start_value: float,
-    stop_value: float,
-    num_steps: int,
+    start_value: float | None = None,
+    stop_value: float | None = None,
+    num_steps: int | None = None,
     step_dt: float,
+    values: list[float] | None = None,
 ) -> list[WidgetAction]:
     """Generate time-scheduled slider step actions for a widget.
 
-    This helper creates a sequence of `WidgetAction` objects that gradually set
-    the state of the given widget from `start_value` to `stop_value` in uniform
-    increments. Each action is scheduled at a fixed time offset, forming a smooth,
-    evenly paced animation when executed by a `WidgetAnimator`.
+    This helper creates a sequence of `WidgetAction` objects that set the state
+    of the given widget to a series of values at evenly spaced time intervals.
+    The values can either be provided directly via the `values` parameter, or
+    interpolated uniformly from `start_value` to `stop_value` using `num_steps`.
 
     Args:
         widget: The widget whose `.set_state()` method will be invoked at each step.
-        start_value: Initial slider value at time zero.
-        stop_value: Final slider value at the last step.
+        start_value: Initial slider value at time zero (used only in interpolation
+            mode).
+        stop_value: Final slider value at the last step (used only in interpolation
+            mode).
         num_steps: Number of interpolation steps, including both endpoints.
             Must be >= 2. The slider values will be linearly spaced across these steps.
+            (used only in interpolation mode).
         step_dt: Time interval in seconds between consecutive actions.
+        values: Optional list of explicit values to use. If provided, interpolation
+            parameters (start_value, stop_value, num_steps) must not be specified.
 
     Returns:
         list[WidgetAction]: A list of actions, sorted by increasing time, where each
-        action updates the widget's state to a specific intermediate value.
+        action updates the widget's state to a specific value.
+
+    Raises:
+        ValueError: If both modes are specified, or if neither mode is properly
+            specified.
     """
-    if num_steps < 2:
-        return []
+    has_values = values is not None
+    has_interpolation = any(x is not None for x in (start_value, stop_value, num_steps))
 
-    delta = (stop_value - start_value) / (num_steps - 1)
+    if has_values and has_interpolation:
+        raise ValueError(
+            "Cannot specify both 'values' and interpolation parameters "
+            "(start_value, stop_value, num_steps). Choose one mode or the other."
+        )
+    elif has_values:
+        value_list = values
+    elif has_interpolation:
+        if start_value is None or stop_value is None or num_steps is None:
+            raise ValueError(
+                "All of (start_value, stop_value, num_steps) must be provided "
+                "when using interpolation mode."
+            )
+        if num_steps < 2:
+            return []
+        delta = (stop_value - start_value) / (num_steps - 1)
+        value_list = [start_value + i * delta for i in range(num_steps)]
+    else:
+        raise ValueError(
+            "Either 'values' or all of (start_value, stop_value, num_steps) "
+            "must be provided."
+        )
+
+    # Create actions from the value list
     actions: list[WidgetAction] = []
-
-    for i in range(num_steps):
+    for i, value in enumerate(value_list):
         t = i * step_dt
-        value = start_value + i * delta
-
         actions.append(
             WidgetAction(
                 time=t,
