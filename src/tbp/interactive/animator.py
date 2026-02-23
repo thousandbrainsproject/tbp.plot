@@ -143,7 +143,6 @@ def make_slider_step_actions_for_widget(
         ValueError: If both modes are specified, or if neither mode is properly
             specified.
     """
-    # Check if both modes are specified
     has_values = values is not None
     has_interpolation = any(x is not None for x in (start_value, stop_value, num_steps))
 
@@ -152,13 +151,14 @@ def make_slider_step_actions_for_widget(
             "Cannot specify both 'values' and interpolation parameters "
             "(start_value, stop_value, num_steps). Choose one mode or the other."
         )
-
-    # Determine which mode to use
-    if values is not None:
-        # Use provided values directly
+    elif has_values:
         value_list = values
-    elif start_value is not None and stop_value is not None and num_steps is not None:
-        # Interpolate values
+    elif has_interpolation:
+        if start_value is None or stop_value is None or num_steps is None:
+            raise ValueError(
+                "All of (start_value, stop_value, num_steps) must be provided "
+                "when using interpolation mode."
+            )
         if num_steps < 2:
             return []
         delta = (stop_value - start_value) / (num_steps - 1)
@@ -166,7 +166,7 @@ def make_slider_step_actions_for_widget(
     else:
         raise ValueError(
             "Either 'values' or all of (start_value, stop_value, num_steps) "
-            "must be provided"
+            "must be provided."
         )
 
     # Create actions from the value list
