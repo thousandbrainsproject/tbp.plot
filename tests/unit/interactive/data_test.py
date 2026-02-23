@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import unittest
 
+import numpy as np
+
 from tbp.interactive.data import (
     DataLocator,
     DataLocatorStep,
     DataParser,
     EpisodeStepMapper,
+    HierarchyStepMapper,
 )
 
 
@@ -213,6 +216,23 @@ class BaseWithSampleData(unittest.TestCase):
         self.sample_data = None
 
 
+class FakeHierarchyDataParser(DataParser):
+    """Parser with injected hierarchical LM data for HierarchyStepMapper tests."""
+
+    def __init__(self):
+        self.data = {
+            "0": {
+                "LM_0": {
+                    "lm_processed_steps": [1, 0, 0, 1, 1, 0, 1, 1],
+                },
+                "LM_1": {
+                    "lm_processed_steps": [0, 0, 0, 0, 1, 0, 1, 1],
+                },
+                "motor_system": {},
+            }
+        }
+
+
 class FakeEpisodeStepMapperDataParser(DataParser):
     """Parser with data shaped for EpisodeStepMapper: 3 episodes with 3, 2, 5 steps."""
 
@@ -234,6 +254,166 @@ class FakeEpisodeStepMapperDataParser(DataParser):
                 },
             },
         }
+
+
+class TestHierarchyStepMapper(unittest.TestCase):
+    """Tests for HierarchyStepMapper class."""
+
+    def setUp(self) -> None:
+        self.parser = FakeHierarchyDataParser()
+        self.mapper = HierarchyStepMapper(self.parser, episode="0")
+
+    def test_available_levels(self) -> None:
+        """Verify agent and all LM levels are returned, sorted."""
+        levels = self.mapper.available_levels()
+        self.assertEqual(levels, ["agent", "LM_0", "LM_1"])
+
+    def test_num_steps_agent(self) -> None:
+        """Agent level should have 8 steps (length of mask)."""
+        self.assertEqual(self.mapper.num_steps("agent"), 8)
+
+    def test_num_steps_lm0(self) -> None:
+        """LM_0 has 5 processed steps (5 ones in mask)."""
+        self.assertEqual(self.mapper.num_steps("LM_0"), 5)
+
+    def test_num_steps_lm1(self) -> None:
+        """LM_1 has 3 processed steps (3 ones in mask)."""
+        self.assertEqual(self.mapper.num_steps("LM_1"), 3)
+
+    def test_num_steps_unknown_level_raises(self) -> None:
+        """Unknown level should raise ValueError."""
+        with self.assertRaises(ValueError):
+            self.mapper.num_steps("LM_2")
+
+    def test_lm0_to_agent(self) -> None:
+        """Test LM_0 -> agent conversions."""
+        # LM_0 mask: [1, 0, 0, 1, 1, 0, 1, 1] -> agent indices: [0, 3, 4, 6, 7]
+        self.assertEqual(self.mapper.convert(0, "LM_0", "agent"), 0)
+        self.assertEqual(self.mapper.convert(1, "LM_0", "agent"), 3)
+        self.assertEqual(self.mapper.convert(2, "LM_0", "agent"), 4)
+        self.assertEqual(self.mapper.convert(3, "LM_0", "agent"), 6)
+        self.assertEqual(self.mapper.convert(4, "LM_0", "agent"), 7)
+
+    def test_lm1_to_agent(self) -> None:
+        """Test LM_1 -> agent conversions."""
+        # LM_1 mask: [0, 0, 0, 0, 1, 0, 1, 1] -> agent indices: [4, 6, 7]
+        self.assertEqual(self.mapper.convert(0, "LM_1", "agent"), 4)
+        self.assertEqual(self.mapper.convert(1, "LM_1", "agent"), 6)
+        self.assertEqual(self.mapper.convert(2, "LM_1", "agent"), 7)
+
+    def test_agent_to_lm0(self) -> None:
+        """Test agent -> LM_0 conversions (with None cases)."""
+        self.assertEqual(self.mapper.convert(0, "agent", "LM_0"), 0)
+        self.assertIsNone(self.mapper.convert(1, "agent", "LM_0"))
+        self.assertIsNone(self.mapper.convert(2, "agent", "LM_0"))
+        self.assertEqual(self.mapper.convert(3, "agent", "LM_0"), 1)
+        self.assertEqual(self.mapper.convert(4, "agent", "LM_0"), 2)
+        self.assertIsNone(self.mapper.convert(5, "agent", "LM_0"))
+        self.assertEqual(self.mapper.convert(6, "agent", "LM_0"), 3)
+        self.assertEqual(self.mapper.convert(7, "agent", "LM_0"), 4)
+
+    def test_agent_to_lm1(self) -> None:
+        """Test agent -> LM_1 conversions (with None cases)."""
+        self.assertIsNone(self.mapper.convert(0, "agent", "LM_1"))
+        self.assertIsNone(self.mapper.convert(1, "agent", "LM_1"))
+        self.assertIsNone(self.mapper.convert(2, "agent", "LM_1"))
+        self.assertIsNone(self.mapper.convert(3, "agent", "LM_1"))
+        self.assertEqual(self.mapper.convert(4, "agent", "LM_1"), 0)
+        self.assertIsNone(self.mapper.convert(5, "agent", "LM_1"))
+        self.assertEqual(self.mapper.convert(6, "agent", "LM_1"), 1)
+        self.assertEqual(self.mapper.convert(7, "agent", "LM_1"), 2)
+
+    def test_lm0_to_lm1(self) -> None:
+        """Test LM_0 -> LM_1 cross-level conversions."""
+        # LM_0 step 0 (agent 0) -> LM_1: None (agent 0 not in LM_1)
+        self.assertIsNone(self.mapper.convert(0, "LM_0", "LM_1"))
+        # LM_0 step 1 (agent 3) -> LM_1: None (agent 3 not in LM_1)
+        self.assertIsNone(self.mapper.convert(1, "LM_0", "LM_1"))
+        # LM_0 step 2 (agent 4) -> LM_1 step 0
+        self.assertEqual(self.mapper.convert(2, "LM_0", "LM_1"), 0)
+        # LM_0 step 3 (agent 6) -> LM_1 step 1
+        self.assertEqual(self.mapper.convert(3, "LM_0", "LM_1"), 1)
+        # LM_0 step 4 (agent 7) -> LM_1 step 2
+        self.assertEqual(self.mapper.convert(4, "LM_0", "LM_1"), 2)
+
+    def test_lm1_to_lm0(self) -> None:
+        """Test LM_1 -> LM_0 cross-level conversions."""
+        # LM_1 step 0 (agent 4) -> LM_0 step 2
+        self.assertEqual(self.mapper.convert(0, "LM_1", "LM_0"), 2)
+        # LM_1 step 1 (agent 6) -> LM_0 step 3
+        self.assertEqual(self.mapper.convert(1, "LM_1", "LM_0"), 3)
+        # LM_1 step 2 (agent 7) -> LM_0 step 4
+        self.assertEqual(self.mapper.convert(2, "LM_1", "LM_0"), 4)
+
+    def test_same_level_identity(self) -> None:
+        """Converting same level returns the input step."""
+        self.assertEqual(self.mapper.convert(3, "agent", "agent"), 3)
+        self.assertEqual(self.mapper.convert(2, "LM_0", "LM_0"), 2)
+        self.assertEqual(self.mapper.convert(1, "LM_1", "LM_1"), 1)
+
+    def test_invalid_from_level_raises(self) -> None:
+        """Unknown from_level should raise ValueError."""
+        with self.assertRaises(ValueError):
+            self.mapper.convert(0, "LM_2", "agent")
+
+    def test_invalid_to_level_raises(self) -> None:
+        """Unknown to_level should raise ValueError."""
+        with self.assertRaises(ValueError):
+            self.mapper.convert(0, "agent", "unknown")
+
+    def test_step_out_of_range_negative_raises(self) -> None:
+        """Negative step index should raise ValueError."""
+        with self.assertRaises(ValueError):
+            self.mapper.convert(-1, "agent", "LM_0")
+
+    def test_step_out_of_range_too_large_raises(self) -> None:
+        """Step index beyond range should raise ValueError."""
+        with self.assertRaises(ValueError):
+            self.mapper.convert(8, "agent", "LM_0")  # max is 7
+        with self.assertRaises(ValueError):
+            self.mapper.convert(5, "LM_0", "agent")  # max is 4
+        with self.assertRaises(ValueError):
+            self.mapper.convert(3, "LM_1", "agent")  # max is 2
+
+    def test_get_agent_indices_lm0(self) -> None:
+        """get_agent_indices for LM_0 returns correct array."""
+        indices = self.mapper.get_agent_indices("LM_0")
+        np.testing.assert_array_equal(indices, [0, 3, 4, 6, 7])
+
+    def test_get_agent_indices_lm1(self) -> None:
+        """get_agent_indices for LM_1 returns correct array."""
+        indices = self.mapper.get_agent_indices("LM_1")
+        np.testing.assert_array_equal(indices, [4, 6, 7])
+
+    def test_get_agent_indices_returns_copy(self) -> None:
+        """get_agent_indices should return a copy to prevent mutation."""
+        indices = self.mapper.get_agent_indices("LM_0")
+        indices[0] = 999
+
+        # Original should be unchanged
+        original = self.mapper.get_agent_indices("LM_0")
+        self.assertEqual(original[0], 0)
+
+    def test_get_agent_indices_agent_level_raises(self) -> None:
+        """get_agent_indices for 'agent' level should raise ValueError."""
+        with self.assertRaises(ValueError):
+            self.mapper.get_agent_indices("agent")
+
+    def test_get_agent_indices_unknown_level_raises(self) -> None:
+        """get_agent_indices for unknown level should raise ValueError."""
+        with self.assertRaises(ValueError):
+            self.mapper.get_agent_indices("LM_2")
+
+    def test_get_union_agent_indices(self) -> None:
+        """get_union_agent_indices returns union of all LM agent steps."""
+        # LM_0: [0, 3, 4, 6, 7], LM_1: [4, 6, 7]
+        # Union: [0, 3, 4, 6, 7] (sorted unique)
+        union = self.mapper.get_union_agent_indices()
+        np.testing.assert_array_equal(union, [0, 3, 4, 6, 7])
+
+    def tearDown(self) -> None:
+        self.parser = None
+        self.mapper = None
 
 
 class TestEpisodeStepMapper(unittest.TestCase):
