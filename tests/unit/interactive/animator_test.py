@@ -289,7 +289,7 @@ class TestMakeSliderStepActions(unittest.TestCase):
                 stop_value=1.0,
                 step_dt=0.5,
             )
-        self.assertIn("Either 'values' or all of", str(cm.exception))
+        self.assertIn("All of (start_value, stop_value, num_steps)", str(cm.exception))
 
         # Missing stop_value
         with self.assertRaises(ValueError) as cm:
@@ -299,7 +299,7 @@ class TestMakeSliderStepActions(unittest.TestCase):
                 num_steps=5,
                 step_dt=0.5,
             )
-        self.assertIn("Either 'values' or all of", str(cm.exception))
+        self.assertIn("All of (start_value, stop_value, num_steps)", str(cm.exception))
 
 
 if __name__ == "__main__":
