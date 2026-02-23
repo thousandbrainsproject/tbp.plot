@@ -546,6 +546,27 @@ class HierarchyStepMapper:
     Converts step indices between 'agent' and LM levels ('LM_0', 'LM_1', etc.) using
     the agent level as an anchor.
 
+    Each LM logs a boolean mask (`lm_processed_steps`) of length
+    `num_agent_steps` indicating which agent-level steps it actually
+    processed.  In a stacked hierarchy the masks can differ between LMs:
+
+    Example of stacked LMs with 10 agent steps:
+
+        LM_1 mask:    F  T  F  T  F  T  T  F  T  F
+        LM_0 mask:    T  T  T  T  T  F  T  T  T  T
+        agent steps:  0  1  2  3  4  5  6  7  8  9
+
+    Here LM_1 is mostly a subset of LM_0, but agent step 5 was processed
+    only by LM_1 (not LM_0). LMs may not process every agent step. This can
+    happen for many reasons (e.g., no feature change, `motor_only_step` or
+    `observed_state.use_state=False`).
+
+    Because each LM has its own local step indexing (0, 1, 2, …), a single
+    agent step maps to different local indices in each LM, and some
+    conversions return `None` when the target LM did not process that
+    step.  The `convert` method handles this by routing cross-LM
+    conversions through the anchor agent level: `LM_0 -> agent -> LM_1`.
+
     Attributes:
         data_parser: The DataParser instance for extracting data.
         episode: The episode number as string.
