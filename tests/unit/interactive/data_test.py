@@ -10,7 +10,12 @@ from __future__ import annotations
 
 import unittest
 
-from tbp.interactive.data import DataLocator, DataLocatorStep, DataParser
+from tbp.interactive.data import (
+    DataLocator,
+    DataLocatorStep,
+    DataParser,
+    EpisodeStepMapper,
+)
 
 
 class FakeDataParser(DataParser):
@@ -178,6 +183,100 @@ class BaseWithSampleData(unittest.TestCase):
     def tearDown(self) -> None:
         self.parser = None
         self.sample_data = None
+
+
+class FakeEpisodeStepMapperDataParser(DataParser):
+    """Parser with data shaped for EpisodeStepMapper: 3 episodes with 3, 2, 5 steps."""
+
+    def __init__(self) -> None:
+        self.data = {
+            "0": {
+                "LM_0": {
+                    "time": [0.0, 1.0, 2.0],
+                },
+            },
+            "1": {
+                "LM_0": {
+                    "time": [0.0, 1.0],
+                },
+            },
+            "2": {
+                "LM_0": {
+                    "time": [0.0, 1.0, 2.0, 3.0, 4.0],
+                },
+            },
+        }
+
+
+class TestEpisodeStepMapper(unittest.TestCase):
+    """Tests for the EpisodeStepMapper class.
+
+    Episode layout:
+        episode 0: 3 steps -> global [0, 1, 2]
+        episode 1: 2 steps -> global [3, 4]
+        episode 2: 5 steps -> global [5, 6, 7, 8, 9]
+        total: 10 steps
+    """
+
+    def setUp(self) -> None:
+        self.parser = FakeEpisodeStepMapperDataParser()
+        self.mapper = EpisodeStepMapper(self.parser)
+
+    def test_num_episodes(self) -> None:
+        self.assertEqual(self.mapper.num_episodes, 3)
+
+    def test_total_num_steps(self) -> None:
+        self.assertEqual(self.mapper.total_num_steps, 10)
+
+    def test_global_to_local_first_episode(self) -> None:
+        self.assertEqual(self.mapper.global_to_local(0), (0, 0))
+        self.assertEqual(self.mapper.global_to_local(1), (0, 1))
+        self.assertEqual(self.mapper.global_to_local(2), (0, 2))
+
+    def test_global_to_local_second_episode(self) -> None:
+        self.assertEqual(self.mapper.global_to_local(3), (1, 0))
+        self.assertEqual(self.mapper.global_to_local(4), (1, 1))
+
+    def test_global_to_local_third_episode(self) -> None:
+        self.assertEqual(self.mapper.global_to_local(5), (2, 0))
+        self.assertEqual(self.mapper.global_to_local(9), (2, 4))
+
+    def test_local_to_global(self) -> None:
+        self.assertEqual(self.mapper.local_to_global(0, 0), 0)
+        self.assertEqual(self.mapper.local_to_global(0, 2), 2)
+        self.assertEqual(self.mapper.local_to_global(1, 0), 3)
+        self.assertEqual(self.mapper.local_to_global(1, 1), 4)
+        self.assertEqual(self.mapper.local_to_global(2, 0), 5)
+        self.assertEqual(self.mapper.local_to_global(2, 4), 9)
+
+    def test_roundtrip_global_to_local_to_global(self) -> None:
+        for g in range(self.mapper.total_num_steps):
+            ep, local = self.mapper.global_to_local(g)
+            self.assertEqual(self.mapper.local_to_global(ep, local), g)
+
+    def test_global_to_local_negative_raises(self) -> None:
+        with self.assertRaises(IndexError):
+            self.mapper.global_to_local(-1)
+
+    def test_global_to_local_out_of_range_raises(self) -> None:
+        with self.assertRaises(IndexError):
+            self.mapper.global_to_local(10)
+
+    def test_local_to_global_episode_out_of_range_raises(self) -> None:
+        with self.assertRaises(IndexError):
+            self.mapper.local_to_global(3, 0)
+
+    def test_local_to_global_negative_episode_raises(self) -> None:
+        with self.assertRaises(IndexError):
+            self.mapper.local_to_global(-1, 0)
+
+    def test_local_to_global_step_out_of_range_raises(self) -> None:
+        with self.assertRaises(IndexError):
+            self.mapper.local_to_global(0, 3)
+
+    def test_local_to_global_negative_step_raises(self) -> None:
+        with self.assertRaises(IndexError):
+            self.mapper.local_to_global(0, -1)
 
 
 if __name__ == "__main__":
