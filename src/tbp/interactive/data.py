@@ -45,18 +45,18 @@ class YCBMeshLoader:
         self,
         data_path: str,
         mesh_subpath: str = "google_16k/textured.glb.orig",
-        rotate_obj: bool = True,
+        ycb_rotate_obj: bool = True,
     ):
         """Initialize the loader.
 
         Args:
             data_path: Path to the root directory holding YCB object folders.
             mesh_subpath: Relative path from an object folder to its mesh file.
-            rotate_obj: Whether to apply the 90 degrees YCB rotation.
+            ycb_rotate_obj: Whether to apply the 90 degrees YCB rotation.
         """
         self.data_path = data_path
         self.mesh_subpath = mesh_subpath
-        self.rotate_obj = rotate_obj
+        self.ycb_rotate_obj = ycb_rotate_obj
 
     def _find_glb_file(self, obj_name: str) -> str:
         """Search for the .glb.orig file of a given YCB object in a directory.
@@ -109,7 +109,7 @@ class YCBMeshLoader:
         )
 
         # Shift to geometry mean and rotate to the up/front of the glb
-        if self.rotate_obj:
+        if self.ycb_rotate_obj:
             obj.shift(-np.mean(obj.bounds().reshape(3, 2), axis=1))
             obj.rotate_x(-90)
 
