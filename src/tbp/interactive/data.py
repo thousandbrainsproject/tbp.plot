@@ -8,8 +8,8 @@
 # https://opensource.org/licenses/MIT.
 from __future__ import annotations
 
-import colorsys
 import bisect
+import colorsys
 import os
 import pickle
 import types
