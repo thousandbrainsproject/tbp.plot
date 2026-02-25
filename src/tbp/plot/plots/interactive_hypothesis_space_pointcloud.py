@@ -73,6 +73,10 @@ COLOR_PALETTE = {
     "Accent3": Palette.as_hex("rich_black"),
 }
 
+MAIN_RENDERER_IX = 0
+SIMULATOR_IX = 1
+MODEL_IX = 2
+
 
 class StepSliderWidgetOps:
     """WidgetOps implementation for a Step slider.
@@ -119,13 +123,15 @@ class StepSliderWidgetOps:
     def add(self, callback: Callable) -> Slider2D:
         kwargs = deepcopy(self._add_kwargs)
         kwargs.update({"xmax": self.step_mapper.total_num_steps - 1})
-        widget = self.plotter.at(0).add_slider(callback, **kwargs)
-        self.plotter.at(0).render()
+        renderer = self.plotter.at(MAIN_RENDERER_IX)
+        widget = renderer.add_slider(callback, **kwargs)
+        renderer.render()
         return widget
 
     def remove(self, widget: Slider2D) -> None:
-        self.plotter.at(0).remove(widget)
-        self.plotter.at(0).render()
+        renderer = self.plotter.at(MAIN_RENDERER_IX)
+        renderer.remove(widget)
+        renderer.render()
 
     def extract_state(self, widget: Slider2D) -> int:
         return extract_slider_state(widget)
@@ -257,8 +263,9 @@ class GtMeshWidgetOps:
 
     def remove(self, widget: Mesh) -> None:
         if widget is not None:
-            self.plotter.at(1).remove(widget)
-            self.plotter.at(1).render()
+            renderer = self.plotter.at(SIMULATOR_IX)
+            renderer.remove(widget)
+            renderer.render()
 
     def update_mesh(
         self, widget: Mesh | None, msgs: list[TopicMessage]
@@ -301,8 +308,9 @@ class GtMeshWidgetOps:
         widget.shift(*target_pos)
         widget.alpha(1.0 - msgs_dict["transparency_value"])
 
-        self.plotter.at(1).add(widget)
-        self.plotter.at(1).render()
+        renderer = self.plotter.at(SIMULATOR_IX)
+        renderer.add(widget)
+        renderer.render()
 
         return widget, False
 
@@ -344,26 +352,26 @@ class GtMeshWidgetOps:
             self.agent_sphere = Sphere(
                 pos=agent_pos, r=0.004, c=COLOR_PALETTE["Secondary"]
             )
-            self.plotter.at(1).add(self.agent_sphere)
+            self.plotter.at(SIMULATOR_IX).add(self.agent_sphere)
         self.agent_sphere.pos(agent_pos)
 
         if self.gaze_line is None:
             self.gaze_line = Line(
                 agent_pos, patch_pos, c=COLOR_PALETTE["Accent3"], lw=4
             )
-            self.plotter.at(1).add(self.gaze_line)
+            self.plotter.at(SIMULATOR_IX).add(self.gaze_line)
         self.gaze_line.points = [agent_pos, patch_pos]
 
-        self.plotter.at(1).render()
+        self.plotter.at(SIMULATOR_IX).render()
 
         return widget, False
 
     def _clear_agent_path(self) -> None:
         for s in self.agent_path_spheres:
-            self.plotter.at(1).remove(s)
+            self.plotter.at(SIMULATOR_IX).remove(s)
         self.agent_path_spheres.clear()
         if self.agent_path_line is not None:
-            self.plotter.at(1).remove(self.agent_path_line)
+            self.plotter.at(SIMULATOR_IX).remove(self.agent_path_line)
             self.agent_path_line = None
 
     def update_agent_path(
@@ -384,7 +392,7 @@ class GtMeshWidgetOps:
             mapping = np.flatnonzero(steps_mask)
 
             if len(mapping) == 0:
-                self.plotter.at(1).render()
+                self.plotter.at(SIMULATOR_IX).render()
                 return widget, False
 
             # Clamp step_number to valid range
@@ -403,23 +411,23 @@ class GtMeshWidgetOps:
             # Create small spheres at each position
             for p in points:
                 sphere = Sphere(pos=p, r=0.002, c=COLOR_PALETTE["Secondary"])
-                self.plotter.at(1).add(sphere)
+                self.plotter.at(SIMULATOR_IX).add(sphere)
                 self.agent_path_spheres.append(sphere)
 
             # Create a polyline connecting all points
             if len(points) >= 2:
                 self.agent_path_line = Line(points, c=COLOR_PALETTE["Secondary"], lw=1)
-                self.plotter.at(1).add(self.agent_path_line)
+                self.plotter.at(SIMULATOR_IX).add(self.agent_path_line)
 
-        self.plotter.at(1).render()
+        self.plotter.at(SIMULATOR_IX).render()
         return widget, False
 
     def _clear_patch_path(self) -> None:
         for s in self.patch_path_spheres:
-            self.plotter.at(1).remove(s)
+            self.plotter.at(SIMULATOR_IX).remove(s)
         self.patch_path_spheres.clear()
         if self.patch_path_line is not None:
-            self.plotter.at(1).remove(self.patch_path_line)
+            self.plotter.at(SIMULATOR_IX).remove(self.patch_path_line)
             self.patch_path_line = None
 
     def update_patch_path(
@@ -449,15 +457,15 @@ class GtMeshWidgetOps:
             # Create small black spheres at each patch position
             for p in points:
                 sphere = Sphere(pos=p, r=0.002, c=COLOR_PALETTE["Accent3"])
-                self.plotter.at(1).add(sphere)
+                self.plotter.at(SIMULATOR_IX).add(sphere)
                 self.patch_path_spheres.append(sphere)
 
             # Create a thin black polyline connecting all patch positions
             if len(points) >= 2:
                 self.patch_path_line = Line(points, c=COLOR_PALETTE["Accent3"], lw=1)
-                self.plotter.at(1).add(self.patch_path_line)
+                self.plotter.at(SIMULATOR_IX).add(self.patch_path_line)
 
-        self.plotter.at(1).render()
+        self.plotter.at(SIMULATOR_IX).render()
         return widget, False
 
     def update_transparency(
@@ -466,7 +474,7 @@ class GtMeshWidgetOps:
         msgs_dict = {msg.name: msg.value for msg in msgs}
         if widget is not None:
             widget.alpha(1.0 - msgs_dict["transparency_value"])
-            self.plotter.at(1).render()
+            self.plotter.at(SIMULATOR_IX).render()
         return widget, False
 
 
@@ -494,9 +502,10 @@ class TransparencySliderWidgetOps:
         }
 
     def add(self, callback: Callable) -> Slider2D:
-        widget = self.plotter.at(1).add_slider(callback, **self._add_kwargs)
+        renderer = self.plotter.at(SIMULATOR_IX)
+        widget = renderer.add_slider(callback, **self._add_kwargs)
         widget.GetRepresentation().SetLabelHeight(0.05)
-        self.plotter.at(1).render()
+        renderer.render()
         return widget
 
     def extract_state(self, widget: Slider2D) -> float:
@@ -531,8 +540,9 @@ class AgentPathButtonWidgetOps:
         }
 
     def add(self, callback: Callable) -> Button:
-        widget = self.plotter.at(0).add_button(callback, **self._add_kwargs)
-        self.plotter.at(0).render()
+        renderer = self.plotter.at(MAIN_RENDERER_IX)
+        widget = renderer.add_button(callback, **self._add_kwargs)
+        renderer.render()
         return widget
 
     def extract_state(self, widget: Button) -> str:
@@ -570,8 +580,9 @@ class PatchPathButtonWidgetOps:
         }
 
     def add(self, callback: Callable) -> Button:
-        widget = self.plotter.at(0).add_button(callback, **self._add_kwargs)
-        self.plotter.at(0).render()
+        renderer = self.plotter.at(MAIN_RENDERER_IX)
+        widget = renderer.add_button(callback, **self._add_kwargs)
+        renderer.render()
         return widget
 
     def extract_state(self, widget: Button) -> str:
@@ -655,7 +666,7 @@ class HypSpaceWidgetOps:
 
     def remove(self, widget: Mesh) -> None:
         if widget is not None:
-            self.plotter.at(2).remove(widget)
+            self.plotter.at(MODEL_IX).remove(widget)
 
     def update_model(
         self, widget: Mesh | None, msgs: list[TopicMessage]
@@ -682,18 +693,18 @@ class HypSpaceWidgetOps:
             widget.rotate_y(rot_euler[1])
             widget.rotate_z(rot_euler[2])
 
-            self.plotter.at(2).add(widget)
+            self.plotter.at(MODEL_IX).add(widget)
 
-        self.plotter.at(2).render()
+        self.plotter.at(MODEL_IX).render()
         return widget, False
 
     def _clear_hyp_space(self) -> None:
         if self.hyp_space is not None:
-            self.plotter.at(2).remove(self.hyp_space)
+            self.plotter.at(MODEL_IX).remove(self.hyp_space)
             self.hyp_space = None
 
         if self.mlh_sphere is not None:
-            self.plotter.at(2).remove(self.mlh_sphere)
+            self.plotter.at(MODEL_IX).remove(self.mlh_sphere)
             self.mlh_sphere = None
 
     def _extract_obj_telemetry(
@@ -761,7 +772,7 @@ class HypSpaceWidgetOps:
                 c=COLOR_PALETTE["Primary"],
             )
             self.mlh_sphere = mlh_sphere
-            self.plotter.at(2).add(mlh_sphere)
+            self.plotter.at(MODEL_IX).add(mlh_sphere)
         elif hyp_color_button == "Slope":
             pts.cmap("viridis", slopes, vmin=0.0)
             pts.add_scalarbar(title="", pos=[[0.8, 0.3], [0.9, 0.9]])
@@ -792,10 +803,10 @@ class HypSpaceWidgetOps:
             hyp_space = self._create_hyp_space(
                 episode_number, step_number, hyp_color_button, hyp_scope_button
             )
-            self.plotter.at(2).add(hyp_space)
+            self.plotter.at(MODEL_IX).add(hyp_space)
             self.hyp_space = hyp_space
 
-        self.plotter.at(2).render()
+        self.plotter.at(MODEL_IX).render()
         return widget, False
 
 
@@ -816,8 +827,9 @@ class ModelButtonWidgetOps:
         }
 
     def add(self, callback: Callable) -> Button:
-        widget = self.plotter.at(0).add_button(callback, **self._add_kwargs)
-        self.plotter.at(0).render()
+        renderer = self.plotter.at(MAIN_RENDERER_IX)
+        widget = renderer.add_button(callback, **self._add_kwargs)
+        renderer.render()
         return widget
 
     def extract_state(self, widget: Button) -> str:
@@ -850,8 +862,9 @@ class HypScopeButtonWidgetOps:
         }
 
     def add(self, callback: Callable) -> Button:
-        widget = self.plotter.at(0).add_button(callback, **self._add_kwargs)
-        self.plotter.at(0).render()
+        renderer = self.plotter.at(MAIN_RENDERER_IX)
+        widget = renderer.add_button(callback, **self._add_kwargs)
+        renderer.render()
         return widget
 
     def extract_state(self, widget: Button) -> str:
@@ -905,8 +918,9 @@ class HypColorButtonWidgetOps:
         ]
 
     def add(self, callback: Callable) -> Button:
-        widget = self.plotter.at(2).add_button(callback, **self._add_kwargs)
-        self.plotter.at(2).render()
+        renderer = self.plotter.at(MODEL_IX)
+        widget = renderer.add_button(callback, **self._add_kwargs)
+        renderer.render()
         return widget
 
     def extract_state(self, widget: Button) -> str:
@@ -933,7 +947,7 @@ class HypColorButtonWidgetOps:
             x, y = self._add_kwargs["pos"]
             widget.SetPosition(x, y)
 
-        self.plotter.at(2).render()
+        self.plotter.at(MODEL_IX).render()
 
         return widget, False
 
@@ -1016,7 +1030,7 @@ class LinePlotWidgetOps:
 
     def remove(self, widget: Mesh) -> None:
         if widget is not None:
-            self.plotter.at(0).remove(widget)
+            self.plotter.at(MAIN_RENDERER_IX).remove(widget)
 
     def _get_object_segments(self) -> list[tuple[int, int, str]]:
         segments = []
@@ -1288,8 +1302,9 @@ class LinePlotWidgetOps:
         widget.scale(0.5)
         widget.pos(-400, -150, 0)
 
-        self.plotter.at(0).add(widget)
-        self.plotter.at(0).render()
+        renderer = self.plotter.at(MAIN_RENDERER_IX)
+        renderer.add(widget)
+        renderer.render()
 
         return widget, False
 
@@ -1328,7 +1343,8 @@ class ClickWidgetOps:
                 captures a 3D location.
         """
         self._on_change_cb = callback
-        self.plotter.at(0).add_callback("RightButtonPress", self.on_right_click)
+        renderer = self.plotter.at(MAIN_RENDERER_IX)
+        renderer.add_callback("RightButtonPress", self.on_right_click)
 
     def align_camera(self, cam_a: Any, cam_b: Any) -> None:
         """Align the camera objects."""
@@ -1344,22 +1360,22 @@ class ClickWidgetOps:
         Notes:
             Bound to the "RightButtonPress" event in `self.add()`.
         """
-        if event.at == 0:
-            renderer = self.plotter.at(0).renderer
+        if event.at == MAIN_RENDERER_IX:
+            renderer = self.plotter.at(MAIN_RENDERER_IX).renderer
             if renderer is not None:
                 cam = renderer.GetActiveCamera()
                 cam.SetPosition(self.cam_dict["pos"])
                 cam.SetFocalPoint(self.cam_dict["focal_point"])
                 cam.SetViewUp((0, 1, 0))
                 cam.SetClippingRange((0.01, 1000.01))
-                self.plotter.at(0).render()
-        elif event.at == 1:
-            cam_clicked = self.plotter.renderers[1].GetActiveCamera()
-            cam_copy = self.plotter.renderers[2].GetActiveCamera()
+                self.plotter.at(MAIN_RENDERER_IX).render()
+        elif event.at == SIMULATOR_IX:
+            cam_clicked = self.plotter.renderers[SIMULATOR_IX].GetActiveCamera()
+            cam_copy = self.plotter.renderers[MODEL_IX].GetActiveCamera()
             self.align_camera(cam_copy, cam_clicked)
-        elif event.at == 2:
-            cam_clicked = self.plotter.renderers[1].GetActiveCamera()
-            cam_copy = self.plotter.renderers[2].GetActiveCamera()
+        elif event.at == MODEL_IX:
+            cam_clicked = self.plotter.renderers[SIMULATOR_IX].GetActiveCamera()
+            cam_copy = self.plotter.renderers[MODEL_IX].GetActiveCamera()
             self.align_camera(cam_clicked, cam_copy)
 
 
@@ -1439,24 +1455,26 @@ class InteractivePlot:
 
         self.plotter.add_callback("KeyPress", self._on_keypress)
 
-        self.plotter.at(0).show(
-            camera=deepcopy(self.cam_dict),
-            interactive=False,  # Must be set to False if not the last `show` call
-            resetcam=False,
-        )
-        self.plotter.at(1).show(
-            axes=deepcopy(self.axes_dict),
-            interactive=False,  # Must be set to False if not the last `show` call
-            resetcam=True,
-        )
-
-        self.plotter.at(2).show(
-            axes=deepcopy(self.axes_dict),
-            interactive=True,  # Must be set to True on the last `show` call
-            resetcam=True,
-        )
+        self._setup_renderers()
 
         # === No code runs after the last interactive call === #
+
+    def _setup_renderers(self) -> None:
+        self.plotter.at(SIMULATOR_IX).show(
+            axes=deepcopy(self.axes_dict),
+            interactive=False,
+            resetcam=True,
+        )
+        self.plotter.at(MODEL_IX).show(
+            axes=deepcopy(self.axes_dict),
+            interactive=False,
+            resetcam=True,
+        )
+        self.plotter.at(MAIN_RENDERER_IX).show(
+            camera=deepcopy(self.cam_dict),
+            interactive=True,
+            resetcam=False,
+        )
 
     def create_widgets(self):
         widgets = {}
@@ -1612,7 +1630,7 @@ class InteractivePlot:
             self.plotter.interactor.ExitCallback()
             return
 
-        if hasattr(self, "animator") and event.at == 0:
+        if hasattr(self, "animator") and event.at == MAIN_RENDERER_IX:
             if key == "a":
                 if self.animator is not None:
                     self.animator.stop()
@@ -1675,6 +1693,6 @@ def add_arguments(p: argparse.ArgumentParser) -> None:
 
     p.add_argument(
         "--pretrained_models_file",
-        default="~/tbp/results/monty/pretrained_models/pretrained_ycb_v11/surf_agent_1lm_10distinctobj/pretrained/model.pt",
+        default="~/tbp/results/monty/pretrained_models/pretrained_ycb_v12/surf_agent_1lm_10distinctobj/pretrained/model.pt",
         help=("The file containing the pretrained models."),
     )
