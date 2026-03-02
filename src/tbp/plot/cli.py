@@ -50,10 +50,19 @@ def _configure_matplotlib_backend() -> None:
     for backend in candidates:
         try:
             importlib.import_module(f"matplotlib.backends.backend_{backend.lower()}")
-        except ImportError:
+        except (ImportError, RuntimeError):
             continue
         mpl.use(backend)
         return
+
+    print(
+        "Warning: no interactive matplotlib backend (QtAgg, Qt5Agg, TkAgg) could be "
+        "loaded. Plots may not display.\n"
+        "To fix this, install a GUI toolkit (e.g. `uv add pyqt6` or `uv add tk`) "
+        "or set the MPLBACKEND environment variable to a backend that works in your "
+        "environment.",
+        file=sys.stderr,
+    )
 
 
 def _print_list() -> None:
