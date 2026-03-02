@@ -38,6 +38,7 @@ from tbp.interactive.data import (
 from tbp.interactive.topics import TopicMessage, TopicSpec
 from tbp.interactive.utils import (
     Location3D,
+    rotate_about_pivot,
 )
 from tbp.interactive.widget_updaters import WidgetUpdater
 from tbp.interactive.widgets import (
@@ -59,6 +60,7 @@ logger = logging.getLogger(__name__)
 FONT = "Arial"
 FONT_SIZE = 25
 
+_DEFAULT_PIVOT = np.array([0.0, 1.5, 0.0], dtype=float)
 
 COLOR_PALETTE = {
     "Blue": Palette.as_hex("numenta_blue"),
@@ -82,20 +84,16 @@ class StepSliderWidgetOps:
     """WidgetOps implementation for a Step slider.
 
     This class adds a slider widget for the global step. It uses the step mapper
-    to retrieve information about the total number of steps and the mapping between
-    global and local step indices. The published state is in the local format (i.e.,
-    episode and local step values).
+    to retrieve information about the total number of steps. The published state
+    is the global step index; downstream widgets use
+    `step_mapper.global_to_local()` to decode episode and local step values.
 
     Attributes:
         plotter: A `vedo.Plotter` object to add or remove the slider and render.
         data_parser: A parser that extracts or queries information from the
             JSON log file.
         step_mapper: A mapper between local and global step indices.
-        updaters: A list with a single `WidgetUpdater` that reacts to the
-            `"episode_number"` topic and calls `update_slider_range`.
         _add_kwargs: Default keyword arguments passed to `plotter.add_slider`.
-        _locators: Data accessors keyed by name that instruct the `DataParser`
-            how to retrieve the required information.
     """
 
     def __init__(
@@ -118,7 +116,6 @@ class StepSliderWidgetOps:
         }
 
         self.step_mapper = step_mapper
-        self.current_episode: int | None = None
 
     def add(self, callback: Callable) -> Slider2D:
         kwargs = deepcopy(self._add_kwargs)
@@ -140,18 +137,7 @@ class StepSliderWidgetOps:
         set_slider_state(widget, value)
 
     def state_to_messages(self, state: int) -> Iterable[TopicMessage]:
-        episode, step = self.step_mapper.global_to_local(state)
-
-        messages = []
-
-        # Only publish episode number if changed
-        if self.current_episode != episode:
-            messages.append(TopicMessage(name="episode_number", value=episode))
-            self.current_episode = episode
-
-        messages.append(TopicMessage(name="step_number", value=step))
-
-        return messages
+        return [TopicMessage(name="global_step", value=state)]
 
 
 class GtMeshWidgetOps:
@@ -166,38 +152,41 @@ class GtMeshWidgetOps:
     """
 
     def __init__(
-        self, plotter: Plotter, data_parser: DataParser, ycb_loader: YCBMeshLoader
+        self,
+        plotter: Plotter,
+        data_parser: DataParser,
+        ycb_loader: YCBMeshLoader,
+        step_mapper: EpisodeStepMapper,
     ):
         self.plotter = plotter
         self.data_parser = data_parser
         self.ycb_loader = ycb_loader
+        self.step_mapper = step_mapper
+        self.current_episode: int | None = None
+        self.mesh_transparency: float = 0.0
         self.updaters = [
             WidgetUpdater(
                 topics=[
-                    TopicSpec("episode_number", required=True),
-                    TopicSpec("transparency_value", required=True),
+                    TopicSpec("global_step", required=True),
                 ],
                 callback=self.update_mesh,
             ),
             WidgetUpdater(
                 topics=[
-                    TopicSpec("episode_number", required=True),
-                    TopicSpec("step_number", required=True),
+                    TopicSpec("global_step", required=True),
                 ],
                 callback=self.update_agent,
             ),
             WidgetUpdater(
                 topics=[
-                    TopicSpec("episode_number", required=True),
-                    TopicSpec("step_number", required=True),
+                    TopicSpec("global_step", required=True),
                     TopicSpec("agent_path_button", required=True),
                 ],
                 callback=self.update_agent_path,
             ),
             WidgetUpdater(
                 topics=[
-                    TopicSpec("episode_number", required=True),
-                    TopicSpec("step_number", required=True),
+                    TopicSpec("global_step", required=True),
                     TopicSpec("patch_path_button", required=True),
                 ],
                 callback=self.update_patch_path,
@@ -284,13 +273,18 @@ class GtMeshWidgetOps:
             A tuple `(mesh, False)`. The second value is `False` to indicate
             that no publish should occur.
         """
-        self.remove(widget)
         msgs_dict = {msg.name: msg.value for msg in msgs}
+        global_step = msgs_dict["global_step"]
+        episode_number, _ = self.step_mapper.global_to_local(global_step)
+
+        if self.current_episode == episode_number:
+            return widget, False
+        self.current_episode = episode_number
+
+        self.remove(widget)
 
         locator = self._locators["target"]
-        target = self.data_parser.extract(
-            locator, episode=str(msgs_dict["episode_number"])
-        )
+        target = self.data_parser.extract(locator, episode=str(episode_number))
         target_id = target["primary_target_object"]
         target_rot = target["primary_target_rotation_quat"]
         target_pos = target["primary_target_position"]
@@ -306,7 +300,7 @@ class GtMeshWidgetOps:
         widget.rotate_y(rot_euler[1])
         widget.rotate_z(rot_euler[2])
         widget.shift(*target_pos)
-        widget.alpha(1.0 - msgs_dict["transparency_value"])
+        widget.alpha(1.0 - self.mesh_transparency)
 
         renderer = self.plotter.at(SIMULATOR_IX)
         renderer.add(widget)
@@ -328,25 +322,31 @@ class GtMeshWidgetOps:
             that no publish should occur.
         """
         msgs_dict = {msg.name: msg.value for msg in msgs}
-        episode_number = msgs_dict["episode_number"]
-        step_number = msgs_dict["step_number"]
+        global_step = msgs_dict["global_step"]
+        episode_number, step_number = self.step_mapper.global_to_local(global_step)
 
         steps_mask = self.data_parser.extract(
             self._locators["steps_mask"], episode=str(episode_number)
         )
         mapping = np.flatnonzero(steps_mask)
 
-        agent_pos = self.data_parser.extract(
-            self._locators["agent_location"],
-            episode=str(episode_number),
-            sm_step=max(0, int(mapping[step_number]) - 1),
-        )
+        if len(mapping) == 0 or step_number >= len(mapping):
+            return widget, False
 
-        patch_pos = self.data_parser.extract(
-            self._locators["patch_location"],
-            episode=str(episode_number),
-            step=step_number,
-        )
+        try:
+            agent_pos = self.data_parser.extract(
+                self._locators["agent_location"],
+                episode=str(episode_number),
+                sm_step=max(0, int(mapping[step_number]) - 1),
+            )
+
+            patch_pos = self.data_parser.extract(
+                self._locators["patch_location"],
+                episode=str(episode_number),
+                step=step_number,
+            )
+        except IndexError:
+            return widget, False
 
         if self.agent_sphere is None:
             self.agent_sphere = Sphere(
@@ -378,8 +378,8 @@ class GtMeshWidgetOps:
         self, widget: Mesh | None, msgs: list[TopicMessage]
     ) -> tuple[Mesh | None, bool]:
         msgs_dict = {msg.name: msg.value for msg in msgs}
-        episode_number = msgs_dict["episode_number"]
-        step_number = msgs_dict["step_number"]
+        global_step = msgs_dict["global_step"]
+        episode_number, step_number = self.step_mapper.global_to_local(global_step)
         path_button = msgs_dict["agent_path_button"]
 
         # Clear existing path
@@ -401,11 +401,14 @@ class GtMeshWidgetOps:
             # Collect all agent positions up to the current step
             points: list[np.ndarray] = []
             for k in range(max_step_idx + 1):
-                agent_pos = self.data_parser.extract(
-                    self._locators["agent_location"],
-                    episode=str(episode_number),
-                    sm_step=max(0, int(mapping[k]) - 1),
-                )
+                try:
+                    agent_pos = self.data_parser.extract(
+                        self._locators["agent_location"],
+                        episode=str(episode_number),
+                        sm_step=max(0, int(mapping[k]) - 1),
+                    )
+                except IndexError:
+                    continue
                 points.append(agent_pos)
 
             # Create small spheres at each position
@@ -434,8 +437,8 @@ class GtMeshWidgetOps:
         self, widget: None, msgs: list[TopicMessage]
     ) -> tuple[None, bool]:
         msgs_dict = {msg.name: msg.value for msg in msgs}
-        episode_number = msgs_dict["episode_number"]
-        step_number = msgs_dict["step_number"]
+        global_step = msgs_dict["global_step"]
+        episode_number, step_number = self.step_mapper.global_to_local(global_step)
         path_button = msgs_dict["patch_path_button"]
 
         # Clear existing path
@@ -472,8 +475,9 @@ class GtMeshWidgetOps:
         self, widget: None, msgs: list[TopicMessage]
     ) -> tuple[None, bool]:
         msgs_dict = {msg.name: msg.value for msg in msgs}
+        self.mesh_transparency = msgs_dict["transparency_value"]
         if widget is not None:
-            widget.alpha(1.0 - msgs_dict["transparency_value"])
+            widget.alpha(1.0 - self.mesh_transparency)
             self.plotter.at(SIMULATOR_IX).render()
         return widget, False
 
@@ -612,24 +616,24 @@ class HypSpaceWidgetOps:
         plotter: Plotter,
         data_parser: DataParser,
         models_loader: PretrainedModelsLoader,
+        step_mapper: EpisodeStepMapper,
     ):
         self.plotter = plotter
         self.data_parser = data_parser
         self.models_loader = models_loader
+        self.step_mapper = step_mapper
 
         self.updaters = [
             WidgetUpdater(
                 topics=[
-                    TopicSpec("episode_number", required=True),
-                    TopicSpec("step_number", required=True),
+                    TopicSpec("global_step", required=True),
                     TopicSpec("model_button", required=True),
                 ],
                 callback=self.update_model,
             ),
             WidgetUpdater(
                 topics=[
-                    TopicSpec("episode_number", required=True),
-                    TopicSpec("step_number", required=True),
+                    TopicSpec("global_step", required=True),
                     TopicSpec("hyp_color_button", required=True),
                     TopicSpec("hyp_scope_button", required=True),
                 ],
@@ -673,8 +677,8 @@ class HypSpaceWidgetOps:
     ) -> tuple[Mesh | None, bool]:
         self.remove(widget)
         msgs_dict = {msg.name: msg.value for msg in msgs}
-        episode_number = msgs_dict["episode_number"]
-        step_number = msgs_dict["step_number"]
+        global_step = msgs_dict["global_step"]
+        episode_number, _ = self.step_mapper.global_to_local(global_step)
         model_button = msgs_dict["model_button"]
 
         if model_button == "Pretrained Model: On":
@@ -688,10 +692,9 @@ class HypSpaceWidgetOps:
             )
 
             rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
-            rot_euler = rot.as_euler("xyz", degrees=True)
-            widget.rotate_x(rot_euler[0])
-            widget.rotate_y(rot_euler[1])
-            widget.rotate_z(rot_euler[2])
+            widget.vertices = rotate_about_pivot(
+                rot, np.array(widget.vertices), _DEFAULT_PIVOT
+            )
 
             self.plotter.at(MODEL_IX).add(widget)
 
@@ -740,7 +743,7 @@ class HypSpaceWidgetOps:
         step_number: int,
         hyp_color_button: str,
         hyp_scope_button: str,
-    ) -> Points:
+    ) -> Points | None:
         target = self.data_parser.extract(
             self._locators["target"], episode=str(episode_number)
         )
@@ -751,13 +754,13 @@ class HypSpaceWidgetOps:
             episode_number, step_number, target_id
         )
 
-        rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
-        rot_euler = rot.as_euler("xyz", degrees=True)
+        if len(locations) == 0:
+            return None
 
-        pts = Points(np.array(locations), r=6, c=COLOR_PALETTE["Secondary"])
-        pts.rotate_x(rot_euler[0])
-        pts.rotate_y(rot_euler[1])
-        pts.rotate_z(rot_euler[2])
+        rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
+        rotated_locations = rotate_about_pivot(rot, np.array(locations), _DEFAULT_PIVOT)
+
+        pts = Points(rotated_locations, r=6, c=COLOR_PALETTE["Secondary"])
 
         if hyp_color_button == "Evidence":
             pts.cmap("viridis", evidences, vmin=0.0)
@@ -767,7 +770,7 @@ class HypSpaceWidgetOps:
             mlh = np.zeros_like(evidences, dtype=float)
             pts.cmap("viridis", mlh, vmin=0.0, vmax=1.0)
             mlh_sphere = Sphere(
-                pos=locations[int(np.argmax(evidences))],
+                pos=rotated_locations[int(np.argmax(evidences))],
                 r=0.002,
                 c=COLOR_PALETTE["Primary"],
             )
@@ -792,8 +795,8 @@ class HypSpaceWidgetOps:
         self, widget: Points, msgs: list[TopicMessage]
     ) -> tuple[Points, bool]:
         msgs_dict = {msg.name: msg.value for msg in msgs}
-        episode_number = msgs_dict["episode_number"]
-        step_number = msgs_dict["step_number"]
+        global_step = msgs_dict["global_step"]
+        episode_number, step_number = self.step_mapper.global_to_local(global_step)
         hyp_color_button = msgs_dict["hyp_color_button"]
         hyp_scope_button = msgs_dict["hyp_scope_button"]
 
@@ -803,8 +806,9 @@ class HypSpaceWidgetOps:
             hyp_space = self._create_hyp_space(
                 episode_number, step_number, hyp_color_button, hyp_scope_button
             )
-            self.plotter.at(MODEL_IX).add(hyp_space)
-            self.hyp_space = hyp_space
+            if hyp_space is not None:
+                self.plotter.at(MODEL_IX).add(hyp_space)
+                self.hyp_space = hyp_space
 
         self.plotter.at(MODEL_IX).render()
         return widget, False
@@ -973,8 +977,7 @@ class LinePlotWidgetOps:
         self.updaters = [
             WidgetUpdater(
                 topics=[
-                    TopicSpec("episode_number", required=True),
-                    TopicSpec("step_number", required=True),
+                    TopicSpec("global_step", required=True),
                 ],
                 callback=self.update_plot,
             ),
@@ -1294,9 +1297,7 @@ class LinePlotWidgetOps:
     ) -> tuple[Image, bool]:
         self.remove(widget)
         msgs_dict = {msg.name: msg.value for msg in msgs}
-        episode_number = msgs_dict["episode_number"]
-        step_number = msgs_dict["step_number"]
-        global_step = self.step_mapper.local_to_global(episode_number, step_number)
+        global_step = msgs_dict["global_step"]
 
         widget = self._create_burst_figure(global_step)
         widget.scale(0.5)
@@ -1497,6 +1498,7 @@ class InteractivePlot:
                 plotter=self.plotter,
                 data_parser=self.data_parser,
                 ycb_loader=self.ycb_loader,
+                step_mapper=self.step_mapper,
             ),
             scopes=[1],
             bus=self.event_bus,
@@ -1539,6 +1541,7 @@ class InteractivePlot:
                 plotter=self.plotter,
                 data_parser=self.data_parser,
                 models_loader=self.models_loader,
+                step_mapper=self.step_mapper,
             ),
             scopes=[1],
             bus=self.event_bus,
