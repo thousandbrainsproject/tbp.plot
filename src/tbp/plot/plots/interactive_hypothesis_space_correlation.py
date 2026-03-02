@@ -3039,7 +3039,7 @@ class InteractivePlot:
 
         self._setup_renderers()
 
-        # === No code runs after the last interactive call === #
+        # === No code runs after the last interactive call in _setup_renderers() === #
 
     def _setup_renderers(self) -> None:
         self.plotter.at(SIMULATOR_IX).show(
@@ -3054,7 +3054,7 @@ class InteractivePlot:
         )
         self.plotter.at(MAIN_RENDERER_IX).show(
             camera=deepcopy(self.cam_dict),
-            interactive=True,
+            interactive=True,  # Must be set to True on the last `show` call
             resetcam=False,
         )
 
