@@ -38,6 +38,7 @@ from tbp.interactive.data import (
 from tbp.interactive.topics import TopicMessage, TopicSpec
 from tbp.interactive.utils import (
     Location3D,
+    rotate_about_pivot,
 )
 from tbp.interactive.widget_updaters import WidgetUpdater
 from tbp.interactive.widgets import (
@@ -59,6 +60,7 @@ logger = logging.getLogger(__name__)
 FONT = "Arial"
 FONT_SIZE = 25
 
+_DEFAULT_PIVOT = np.array([0.0, 1.5, 0.0], dtype=float)
 
 COLOR_PALETTE = {
     "Blue": Palette.as_hex("numenta_blue"),
@@ -677,10 +679,9 @@ class HypSpaceWidgetOps:
             )
 
             rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
-            rot_euler = rot.as_euler("xyz", degrees=True)
-            widget.rotate_x(rot_euler[0])
-            widget.rotate_y(rot_euler[1])
-            widget.rotate_z(rot_euler[2])
+            widget.vertices = rotate_about_pivot(
+                rot, np.array(widget.vertices), _DEFAULT_PIVOT
+            )
 
             self.plotter.at(2).add(widget)
 
@@ -729,7 +730,7 @@ class HypSpaceWidgetOps:
         step_number: int,
         hyp_color_button: str,
         hyp_scope_button: str,
-    ) -> Points:
+    ) -> Points | None:
         target = self.data_parser.extract(
             self._locators["target"], episode=str(episode_number)
         )
@@ -740,13 +741,13 @@ class HypSpaceWidgetOps:
             episode_number, step_number, target_id
         )
 
-        rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
-        rot_euler = rot.as_euler("xyz", degrees=True)
+        if len(locations) == 0:
+            return None
 
-        pts = Points(np.array(locations), r=6, c=COLOR_PALETTE["Secondary"])
-        pts.rotate_x(rot_euler[0])
-        pts.rotate_y(rot_euler[1])
-        pts.rotate_z(rot_euler[2])
+        rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
+        rotated_locations = rotate_about_pivot(rot, np.array(locations), _DEFAULT_PIVOT)
+
+        pts = Points(rotated_locations, r=6, c=COLOR_PALETTE["Secondary"])
 
         if hyp_color_button == "Evidence":
             pts.cmap("viridis", evidences, vmin=0.0)
@@ -756,7 +757,7 @@ class HypSpaceWidgetOps:
             mlh = np.zeros_like(evidences, dtype=float)
             pts.cmap("viridis", mlh, vmin=0.0, vmax=1.0)
             mlh_sphere = Sphere(
-                pos=locations[int(np.argmax(evidences))],
+                pos=rotated_locations[int(np.argmax(evidences))],
                 r=0.002,
                 c=COLOR_PALETTE["Primary"],
             )
@@ -792,8 +793,9 @@ class HypSpaceWidgetOps:
             hyp_space = self._create_hyp_space(
                 episode_number, step_number, hyp_color_button, hyp_scope_button
             )
-            self.plotter.at(2).add(hyp_space)
-            self.hyp_space = hyp_space
+            if hyp_space is not None:
+                self.plotter.at(2).add(hyp_space)
+                self.hyp_space = hyp_space
 
         self.plotter.at(2).render()
         return widget, False
