@@ -16,11 +16,53 @@ arguments. It is defined as the `plot` project script in `pyproject.toml`.
 
 import argparse
 import importlib
+import os
 import pkgutil
 import sys
 from difflib import get_close_matches
 
+import matplotlib as mpl
+
 from tbp.plot.registry import PlotSpec, all_specs, get
+
+
+def _configure_matplotlib_backend() -> None:
+    """Ensure matplotlib uses an interactive backend for GUI plots.
+
+    On macOS with non-framework Python builds (common with uv and pip),
+    the default matplotlib backend is non-interactive, causing
+    `plt.show()` to return immediately without displaying a window.
+    This selects a working interactive backend before pyplot is imported.
+
+    The ``MPLBACKEND`` environment variable is respected: if set, no
+    override is attempted.
+    """
+    if os.environ.get("MPLBACKEND"):
+        return
+
+    # Probe for GUI backends in preference order by importing the actual
+    # matplotlib backend module. Qt6 > Qt5 > Tk.
+    candidates = [
+        "QtAgg",
+        "Qt5Agg",
+        "TkAgg",
+    ]
+    for backend in candidates:
+        try:
+            importlib.import_module(f"matplotlib.backends.backend_{backend.lower()}")
+        except (ImportError, RuntimeError):
+            continue
+        mpl.use(backend)
+        return
+
+    print(
+        "Warning: no interactive matplotlib backend (QtAgg, Qt5Agg, TkAgg) could be "
+        "loaded. Plots may not display.\n"
+        "To fix this, install a GUI toolkit (e.g. `uv add pyqt6` or `uv add tk`) "
+        "or set the MPLBACKEND environment variable to a backend that works in your "
+        "environment.",
+        file=sys.stderr,
+    )
 
 
 def _print_list() -> None:
@@ -83,6 +125,9 @@ def main() -> int:
     """
     # Arguments passed to `cli.py` excluding script name
     argv = sys.argv[1:]
+
+    # Must run before plot modules are imported.
+    _configure_matplotlib_backend()
 
     # Import all modules under `tbp.plot.plots` to register the plots
     pkg = importlib.import_module("tbp.plot.plots")
