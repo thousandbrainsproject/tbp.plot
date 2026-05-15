@@ -129,12 +129,11 @@ locator = DataLocator(
         ),
         DataLocatorStep.index(name="step"),
         DataLocatorStep.key(name="obj"),
-        DataLocatorStep.key(name="channel"),
     ],
 )
-step_data = data_parser.extract(locator, episode=2, step=3, obj="mug", channel="patch")
+step_data = data_parser.extract(locator, episode=2, step=3, obj="mug")
+available_episodes = data_parser.query(locator)
 available_objects = data_parser.query(locator, episode=2, step=3)
-available_channels = data_parser.query(locator, episode=2, step=3, obj="banana")
 ```
 
 
