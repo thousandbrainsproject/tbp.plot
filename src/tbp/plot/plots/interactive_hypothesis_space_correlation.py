@@ -1310,7 +1310,7 @@ class CorrelationPlotWidgetOps:
         highlight_circle: The small circle placed over the selected point.
         selected_hypothesis: The most recently selected row as a pandas Series.
         info_widget: A `Text2D` widget with a brief summary of the hyp. space.
-        _locators: Data accessors used to query channels and updater stats.
+        _locators: Data accessors used to query hypotheses and updater stats.
         _coordinate_mapper: Maps GUI pixel coordinates to data coordinates, and back.
     """
 
@@ -1351,10 +1351,10 @@ class CorrelationPlotWidgetOps:
         """Create and return data locators used by this widget.
 
         Returns:
-            A dictionary with entries for `"channel"` and `"updater"`.
+            A dictionary with entries for `"obj"` and `"updater"`.
         """
         locators = {}
-        locators["channel"] = DataLocator(
+        locators["obj"] = DataLocator(
             path=[
                 DataLocatorStep.key(name="episode"),
                 DataLocatorStep.key(name="lm", value="LM_0"),
@@ -1363,10 +1363,9 @@ class CorrelationPlotWidgetOps:
                 ),
                 DataLocatorStep.index(name="step"),
                 DataLocatorStep.key(name="obj"),
-                DataLocatorStep.key(name="channel"),
             ],
         )
-        locators["updater"] = locators["channel"].extend(
+        locators["updater"] = locators["obj"].extend(
             steps=[
                 DataLocatorStep.key(name="stat", value="hypotheses_updater"),
             ],
@@ -1406,9 +1405,9 @@ class CorrelationPlotWidgetOps:
         Returns:
             A tuple `(next_episode, next_step)`.
         """
-        last_episode = len(self.data_parser.query(self._locators["channel"])) - 1
+        last_episode = len(self.data_parser.query(self._locators["obj"])) - 1
         last_step = (
-            len(self.data_parser.query(self._locators["channel"], episode=str(episode)))
+            len(self.data_parser.query(self._locators["obj"], episode=str(episode)))
             - 1
         )
         if episode == last_episode and step == last_step:
@@ -1444,7 +1443,7 @@ class CorrelationPlotWidgetOps:
         prev_last_step = (
             len(
                 self.data_parser.query(
-                    self._locators["channel"], episode=str(prev_episode)
+                    self._locators["obj"], episode=str(prev_episode)
                 )
             )
             - 1
@@ -1468,164 +1467,122 @@ class CorrelationPlotWidgetOps:
             graph_id: Object identifier to select within the episode.
 
         Returns:
-            A concatenated `DataFrame` (across input channels) with columns:
+            A `DataFrame` with columns:
             `["graph_id", "Evidence", "Evidence Slope", "Rot_x", "Rot_y", "Rot_z",
-              "Pose Error", "age", "kind", "input_channel"]`.
+              "Pose Error", "age", "kind"]`.
         """
-        input_channels = self.data_parser.query(
-            self._locators["channel"],
+        all_dfs: list[DataFrame] = []
+
+        # Current timestep data
+        obj_data = self.data_parser.extract(
+            self._locators["obj"],
+            episode=str(episode),
+            step=step,
+            obj=graph_id,
+        )
+        updater_data = self.data_parser.extract(
+            self._locators["updater"],
             episode=str(episode),
             step=step,
             obj=graph_id,
         )
 
-        all_dfs: list[DataFrame] = []
-        for input_channel in input_channels:
-            # Current timestep data
-            channel_data = self.data_parser.extract(
-                self._locators["channel"],
-                episode=str(episode),
-                step=step,
-                obj=graph_id,
-                channel=input_channel,
-            )
-            updater_data = self.data_parser.extract(
-                self._locators["updater"],
-                episode=str(episode),
-                step=step,
-                obj=graph_id,
-                channel=input_channel,
-            )
+        # Previous timestep data
+        dec_episode, dec_step = self.decrement_step(episode, step)
+        dec_obj_data = self.data_parser.extract(
+            self._locators["obj"],
+            episode=str(dec_episode),
+            step=dec_step,
+            obj=graph_id,
+        )
+        dec_updater_data = self.data_parser.extract(
+            self._locators["updater"],
+            episode=str(dec_episode),
+            step=dec_step,
+            obj=graph_id,
+        )
 
-            # Previous timestep data
-            dec_episode, dec_step = self.decrement_step(episode, step)
-            dec_channel_data = self.data_parser.extract(
-                self._locators["channel"],
-                episode=str(dec_episode),
-                step=dec_step,
-                obj=graph_id,
-                channel=input_channel,
+        # Removed hypotheses
+        removed_ids = updater_data.get("removed_ids", [])
+        if len(removed_ids) > 0:
+            df_removed = DataFrame(
+                {
+                    "id": removed_ids,
+                    "episode": dec_episode,
+                    "step": dec_step,
+                    "graph_id": graph_id,
+                    "Evidence": np.array(dec_obj_data["evidence"])[removed_ids],
+                    "Evidence Slope": np.array(dec_updater_data["evidence_slopes"])[
+                        removed_ids
+                    ],
+                    "Rot_x": np.array(dec_obj_data["rotations"])[removed_ids][:, 0],
+                    "Rot_y": np.array(dec_obj_data["rotations"])[removed_ids][:, 1],
+                    "Rot_z": np.array(dec_obj_data["rotations"])[removed_ids][:, 2],
+                    "Loc_x": np.array(dec_obj_data["locations"])[removed_ids][:, 0],
+                    "Loc_y": np.array(dec_obj_data["locations"])[removed_ids][:, 1],
+                    "Loc_z": np.array(dec_obj_data["locations"])[removed_ids][:, 2],
+                    "Pose Error": np.array(dec_obj_data["pose_errors"])[removed_ids],
+                    "age": np.array(dec_updater_data["ages"])[removed_ids],
+                    "kind": "Removed",
+                }
             )
-            dec_updater_data = self.data_parser.extract(
-                self._locators["updater"],
-                episode=str(dec_episode),
-                step=dec_step,
-                obj=graph_id,
-                channel=input_channel,
+            all_dfs.append(df_removed)
+
+        # Added hypotheses
+        added_ids = updater_data.get("added_ids", [])
+        if added_ids:
+            df_added = DataFrame(
+                {
+                    "id": added_ids,
+                    "episode": episode,
+                    "step": step,
+                    "graph_id": graph_id,
+                    "Evidence": np.array(obj_data["evidence"])[added_ids],
+                    "Evidence Slope": np.array(updater_data["evidence_slopes"])[
+                        added_ids
+                    ],
+                    "Rot_x": np.array(obj_data["rotations"])[added_ids][:, 0],
+                    "Rot_y": np.array(obj_data["rotations"])[added_ids][:, 1],
+                    "Rot_z": np.array(obj_data["rotations"])[added_ids][:, 2],
+                    "Loc_x": np.array(obj_data["locations"])[added_ids][:, 0],
+                    "Loc_y": np.array(obj_data["locations"])[added_ids][:, 1],
+                    "Loc_z": np.array(obj_data["locations"])[added_ids][:, 2],
+                    "Pose Error": np.array(obj_data["pose_errors"])[added_ids],
+                    "age": np.array(updater_data["ages"])[added_ids],
+                    "kind": "Added",
+                }
             )
+            all_dfs.append(df_added)
 
-            # Removed hypotheses
-            removed_ids = updater_data.get("removed_ids", [])
-            if len(removed_ids) > 0:
-                df_removed = DataFrame(
-                    {
-                        "id": removed_ids,
-                        "episode": dec_episode,
-                        "step": dec_step,
-                        "graph_id": graph_id,
-                        "Evidence": np.array(dec_channel_data["evidence"])[removed_ids],
-                        "Evidence Slope": np.array(dec_updater_data["evidence_slopes"])[
-                            removed_ids
-                        ],
-                        "Rot_x": np.array(dec_channel_data["rotations"])[removed_ids][
-                            :, 0
-                        ],
-                        "Rot_y": np.array(dec_channel_data["rotations"])[removed_ids][
-                            :, 1
-                        ],
-                        "Rot_z": np.array(dec_channel_data["rotations"])[removed_ids][
-                            :, 2
-                        ],
-                        "Loc_x": np.array(dec_channel_data["locations"])[removed_ids][
-                            :, 0
-                        ],
-                        "Loc_y": np.array(dec_channel_data["locations"])[removed_ids][
-                            :, 1
-                        ],
-                        "Loc_z": np.array(dec_channel_data["locations"])[removed_ids][
-                            :, 2
-                        ],
-                        "Pose Error": np.array(dec_channel_data["pose_errors"])[
-                            removed_ids
-                        ],
-                        "age": np.array(dec_updater_data["ages"])[removed_ids],
-                        "kind": "Removed",
-                        "input_channel": input_channel,
-                    }
-                )
-                all_dfs.append(df_removed)
-
-            # Added hypotheses
-            added_ids = updater_data.get("added_ids", [])
-            if added_ids:
-                df_added = DataFrame(
-                    {
-                        "id": added_ids,
-                        "episode": episode,
-                        "step": step,
-                        "graph_id": graph_id,
-                        "Evidence": np.array(channel_data["evidence"])[added_ids],
-                        "Evidence Slope": np.array(updater_data["evidence_slopes"])[
-                            added_ids
-                        ],
-                        "Rot_x": np.array(channel_data["rotations"])[added_ids][:, 0],
-                        "Rot_y": np.array(channel_data["rotations"])[added_ids][:, 1],
-                        "Rot_z": np.array(channel_data["rotations"])[added_ids][:, 2],
-                        "Loc_x": np.array(channel_data["locations"])[added_ids][:, 0],
-                        "Loc_y": np.array(channel_data["locations"])[added_ids][:, 1],
-                        "Loc_z": np.array(channel_data["locations"])[added_ids][:, 2],
-                        "Pose Error": np.array(channel_data["pose_errors"])[added_ids],
-                        "age": np.array(updater_data["ages"])[added_ids],
-                        "kind": "Added",
-                        "input_channel": input_channel,
-                    }
-                )
-                all_dfs.append(df_added)
-
-            # Maintained hypotheses
-            total_ids = list(range(len(updater_data["evidence_slopes"])))
-            maintained_ids = sorted(set(total_ids) - set(added_ids))
-            if maintained_ids:
-                df_maintained = DataFrame(
-                    {
-                        "id": maintained_ids,
-                        "episode": episode,
-                        "step": step,
-                        "graph_id": graph_id,
-                        "Evidence": np.array(channel_data["evidence"])[maintained_ids],
-                        "Evidence Slope": np.array(updater_data["evidence_slopes"])[
-                            maintained_ids
-                        ],
-                        "Rot_x": np.array(channel_data["rotations"])[maintained_ids][
-                            :, 0
-                        ],
-                        "Rot_y": np.array(channel_data["rotations"])[maintained_ids][
-                            :, 1
-                        ],
-                        "Rot_z": np.array(channel_data["rotations"])[maintained_ids][
-                            :, 2
-                        ],
-                        "Loc_x": np.array(channel_data["locations"])[maintained_ids][
-                            :, 0
-                        ],
-                        "Loc_y": np.array(channel_data["locations"])[maintained_ids][
-                            :, 1
-                        ],
-                        "Loc_z": np.array(channel_data["locations"])[maintained_ids][
-                            :, 2
-                        ],
-                        "Pose Error": np.array(channel_data["pose_errors"])[
-                            maintained_ids
-                        ],
-                        "age": np.array(updater_data["ages"])[maintained_ids],
-                        "kind": "Maintained",
-                        "input_channel": input_channel,
-                    }
-                )
-                all_dfs.append(df_maintained)
+        # Maintained hypotheses
+        total_ids = list(range(len(updater_data["evidence_slopes"])))
+        maintained_ids = sorted(set(total_ids) - set(added_ids))
+        if maintained_ids:
+            df_maintained = DataFrame(
+                {
+                    "id": maintained_ids,
+                    "episode": episode,
+                    "step": step,
+                    "graph_id": graph_id,
+                    "Evidence": np.array(obj_data["evidence"])[maintained_ids],
+                    "Evidence Slope": np.array(updater_data["evidence_slopes"])[
+                        maintained_ids
+                    ],
+                    "Rot_x": np.array(obj_data["rotations"])[maintained_ids][:, 0],
+                    "Rot_y": np.array(obj_data["rotations"])[maintained_ids][:, 1],
+                    "Rot_z": np.array(obj_data["rotations"])[maintained_ids][:, 2],
+                    "Loc_x": np.array(obj_data["locations"])[maintained_ids][:, 0],
+                    "Loc_y": np.array(obj_data["locations"])[maintained_ids][:, 1],
+                    "Loc_z": np.array(obj_data["locations"])[maintained_ids][:, 2],
+                    "Pose Error": np.array(obj_data["pose_errors"])[maintained_ids],
+                    "age": np.array(updater_data["ages"])[maintained_ids],
+                    "kind": "Maintained",
+                }
+            )
+            all_dfs.append(df_maintained)
 
         if not all_dfs:
-            # No hypotheses for any input_channel at this (episode, step, graph_id)
+            # No hypotheses at this (episode, step, graph_id)
             return DataFrame(
                 columns=[
                     "id",
@@ -1643,7 +1600,6 @@ class CorrelationPlotWidgetOps:
                     "Pose Error",
                     "age",
                     "kind",
-                    "input_channel",
                 ]
             )
 
@@ -1998,14 +1954,13 @@ class HypothesisMeshWidgetOps:
             ]
         )
 
-        locators["channel"] = locators["step"].extend(
+        locators["obj"] = locators["step"].extend(
             steps=[
                 DataLocatorStep.key(name="obj"),
-                DataLocatorStep.key(name="channel", value="patch"),
             ]
         )
 
-        locators["updater"] = locators["channel"].extend(
+        locators["updater"] = locators["obj"].extend(
             steps=[DataLocatorStep.key(name="stat", value="hypotheses_updater")]
         )
 
@@ -2391,7 +2346,6 @@ class HypSpaceSizeWidgetOps:
                 ),
                 DataLocatorStep.index(name="step"),
                 DataLocatorStep.key(name="obj"),
-                DataLocatorStep.key(name="channel", value="patch"),
                 DataLocatorStep.key(name="telemetry", value="evidence"),
             ]
         )
@@ -2590,14 +2544,13 @@ class HypothesisLifespanWidgetOps:
             ]
         )
 
-        locators["channel"] = locators["step"].extend(
+        locators["obj"] = locators["step"].extend(
             steps=[
                 DataLocatorStep.key(name="obj"),
-                DataLocatorStep.key(name="channel", value="patch"),
             ]
         )
 
-        locators["updater"] = locators["channel"].extend(
+        locators["updater"] = locators["obj"].extend(
             steps=[DataLocatorStep.key(name="stat", value="hypotheses_updater")]
         )
 
@@ -2608,7 +2561,7 @@ class HypothesisLifespanWidgetOps:
     ) -> dict[str, Iterable]:
         """Returns channel data as a dictionary."""
         channel_data = self.data_parser.extract(
-            self._locators["channel"], episode=episode, step=step, obj=obj
+            self._locators["obj"], episode=episode, step=step, obj=obj
         )
         updater_data = self.data_parser.extract(
             self._locators["updater"], episode=episode, step=step, obj=obj
