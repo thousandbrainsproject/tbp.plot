@@ -663,7 +663,6 @@ class HypSpaceWidgetOps:
                 ),
                 DataLocatorStep.index(name="step"),
                 DataLocatorStep.key(name="obj"),
-                DataLocatorStep.key(name="channel", value="patch"),
             ],
         )
         return locators
@@ -997,7 +996,6 @@ class LinePlotWidgetOps:
                 ),
                 DataLocatorStep.index(name="step"),
                 DataLocatorStep.key(name="obj"),
-                DataLocatorStep.key(name="channel", value="patch"),
             ]
         )
 
