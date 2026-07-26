@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -80,6 +81,33 @@ SIMULATOR_IX = 1
 MODEL_IX = 2
 
 
+def _add_button(
+    plotter: Plotter,
+    renderer_ix: int,
+    callback: Callable,
+    add_kwargs: dict[str, Any],
+) -> Button:
+    """Add a button using viewport-relative coordinates.
+
+    Vedo otherwise interprets fractional button positions as pixels, which
+    stacks the controls near the renderer origin.
+
+    Args:
+        plotter: Plotter that owns the button.
+        renderer_ix: Index of the button's renderer.
+        callback: Function invoked when the button changes.
+        add_kwargs: Arguments forwarded to `Plotter.add_button`.
+
+    Returns:
+        The configured button.
+    """
+    renderer = plotter.at(renderer_ix)
+    widget = renderer.add_button(callback, **add_kwargs)
+    widget.GetPositionCoordinate().SetCoordinateSystemToNormalizedViewport()
+    renderer.render()
+    return widget
+
+
 class StepSliderWidgetOps:
     """WidgetOps implementation for a Step slider.
 
@@ -109,7 +137,7 @@ class StepSliderWidgetOps:
             "xmin": 0,
             "xmax": 10,
             "value": 0,
-            "pos": [(0.11, 0.06), (0.89, 0.06)],
+            "pos": [(0.11, 0.12), (0.89, 0.12)],
             "title": "Step",
             "font": FONT,
             "show_value": False,
@@ -544,10 +572,7 @@ class AgentPathButtonWidgetOps:
         }
 
     def add(self, callback: Callable) -> Button:
-        renderer = self.plotter.at(MAIN_RENDERER_IX)
-        widget = renderer.add_button(callback, **self._add_kwargs)
-        renderer.render()
-        return widget
+        return _add_button(self.plotter, MAIN_RENDERER_IX, callback, self._add_kwargs)
 
     def extract_state(self, widget: Button) -> str:
         return extract_button_state(widget)
@@ -584,10 +609,7 @@ class PatchPathButtonWidgetOps:
         }
 
     def add(self, callback: Callable) -> Button:
-        renderer = self.plotter.at(MAIN_RENDERER_IX)
-        widget = renderer.add_button(callback, **self._add_kwargs)
-        renderer.render()
-        return widget
+        return _add_button(self.plotter, MAIN_RENDERER_IX, callback, self._add_kwargs)
 
     def extract_state(self, widget: Button) -> str:
         return extract_button_state(widget)
@@ -686,9 +708,18 @@ class HypSpaceWidgetOps:
             target_id = target["primary_target_object"]
             target_rot = target["primary_target_rotation_quat"]
             target_pos = target["primary_target_position"]
-            widget = self.models_loader.create_model(graph_id=target_id).clone(
-                deep=True
-            )
+            try:
+                widget = self.models_loader.create_model(graph_id=target_id).clone(
+                    deep=True
+                )
+            except KeyError:
+                logger.warning(
+                    "Pretrained model does not contain graph %r; "
+                    "choose a model file containing every experiment target",
+                    target_id,
+                )
+                self.plotter.at(MODEL_IX).render()
+                return None, False
 
             rot = Rotation.from_quat(np.array(target_rot), scalar_first=True)
             widget.vertices = rotate_about_pivot(
@@ -830,10 +861,7 @@ class ModelButtonWidgetOps:
         }
 
     def add(self, callback: Callable) -> Button:
-        renderer = self.plotter.at(MAIN_RENDERER_IX)
-        widget = renderer.add_button(callback, **self._add_kwargs)
-        renderer.render()
-        return widget
+        return _add_button(self.plotter, MAIN_RENDERER_IX, callback, self._add_kwargs)
 
     def extract_state(self, widget: Button) -> str:
         return extract_button_state(widget)
@@ -865,10 +893,7 @@ class HypScopeButtonWidgetOps:
         }
 
     def add(self, callback: Callable) -> Button:
-        renderer = self.plotter.at(MAIN_RENDERER_IX)
-        widget = renderer.add_button(callback, **self._add_kwargs)
-        renderer.render()
-        return widget
+        return _add_button(self.plotter, MAIN_RENDERER_IX, callback, self._add_kwargs)
 
     def extract_state(self, widget: Button) -> str:
         return extract_button_state(widget)
@@ -921,10 +946,7 @@ class HypColorButtonWidgetOps:
         ]
 
     def add(self, callback: Callable) -> Button:
-        renderer = self.plotter.at(MODEL_IX)
-        widget = renderer.add_button(callback, **self._add_kwargs)
-        renderer.render()
-        return widget
+        return _add_button(self.plotter, MODEL_IX, callback, self._add_kwargs)
 
     def extract_state(self, widget: Button) -> str:
         return extract_button_state(widget)
@@ -1297,9 +1319,13 @@ class LinePlotWidgetOps:
         msgs_dict = {msg.name: msg.value for msg in msgs}
         global_step = msgs_dict["global_step"]
 
-        widget = self._create_burst_figure(global_step)
-        widget.scale(0.5)
-        widget.pos(-400, -150, 0)
+        image = self._create_burst_figure(global_step)
+        widget = image.clone2d(
+            size=0.42,
+            justify="bottom-center",
+        )
+        # clone2d resets the position when justification is applied.
+        widget.SetPosition(0.5, 0.18)
 
         renderer = self.plotter.at(MAIN_RENDERER_IX)
         renderer.add(widget)
@@ -1424,11 +1450,6 @@ class InteractivePlot:
             {"bottomleft": (0.51, 0.5), "topright": (0.95, 0.9)},
         ]
 
-        self.axes_dict = {
-            "xrange": (-0.05, 0.05),
-            "yrange": (1.45, 1.55),
-            "zrange": (-0.05, 0.05),
-        }
         self.cam_dict = {"pos": (300, 200, 1500), "focal_point": (300, 200, 0)}
 
         self.data_parser = DataParser(exp_path)
@@ -1436,42 +1457,70 @@ class InteractivePlot:
         self.ycb_loader = YCBMeshLoader(data_path)
         self.models_loader = PretrainedModelsLoader(models_path)
         self.event_bus = Publisher()
-        self.plotter = Plotter(shape=renderer_areas, sharecam=False).render()
-        self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=33)
+        self.plotter = Plotter(
+            shape=renderer_areas,
+            size=(2700, 1650),
+            sharecam=False,
+        ).render()
+        # VTK timer callbacks are unstable in the macOS Cocoa event loop.
+        self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=0)
         self.animator = None
 
-        # create and add the widgets to the plotter
         self._widgets = self.create_widgets()
-        for w in self._widgets.values():
-            w.add()
-        self._widgets["step_slider"].set_state(0)
-        self._widgets["agent_path_button"].set_state("Agent Path: Off")
-        self._widgets["patch_path_button"].set_state("Patch Path: Off")
-        self._widgets["transparency_slider"].set_state(0.0)
-        self._widgets["model_button"].set_state("Pretrained Model: On")
-        self._widgets["hyp_color_button"].set_state("None")
-        self._widgets["hyp_scope_button"].set_state("Hypotheses: Off")
+        for widget in self._widgets.values():
+            widget.add()
+
+        initial_states = {
+            "step_slider": 0,
+            "agent_path_button": "Agent Path: Off",
+            "patch_path_button": "Patch Path: Off",
+            "transparency_slider": 0.0,
+            "model_button": "Pretrained Model: On",
+            "hyp_color_button": "None",
+            "hyp_scope_button": "Hypotheses: On",
+        }
 
         self.plotter.add_callback("KeyPress", self._on_keypress)
 
         self._setup_renderers()
+        for name, state in initial_states.items():
+            self._widgets[name].set_state(state)
 
-        # === No code runs after the last interactive call in _setup_renderers() === #
+        # Initial publications create actors; frame cameras only afterward.
+        for renderer_ix in (SIMULATOR_IX, MODEL_IX):
+            renderer = self.plotter.renderers[renderer_ix]
+            renderer.ResetCamera()
+            renderer.ResetCameraClippingRange()
+
+        self.plotter.window.Render()
+        self._run_interactor()
+
+    def _run_interactor(self) -> None:
+        """Run VTK events without Cocoa's blocking native interactor.
+
+        Processing events explicitly keeps resizing and controls responsive,
+        allows keyboard interrupts, and ensures the window is closed cleanly.
+        """
+        interactor = self.plotter.interactor
+        interactor.Initialize()
+        interactor.Enable()
+
+        try:
+            while not interactor.GetDone():
+                interactor.ProcessEvents()
+                time.sleep(0.01)
+        except KeyboardInterrupt:
+            logger.info("Pointcloud visualization interrupted")
+        finally:
+            self.scheduler.shutdown()
+            self.plotter.close()
 
     def _setup_renderers(self) -> None:
-        self.plotter.at(SIMULATOR_IX).show(
-            axes=deepcopy(self.axes_dict),
-            interactive=False,
-            resetcam=True,
-        )
-        self.plotter.at(MODEL_IX).show(
-            axes=deepcopy(self.axes_dict),
-            interactive=False,
-            resetcam=True,
-        )
+        for renderer_ix in (SIMULATOR_IX, MODEL_IX):
+            self.plotter.at(renderer_ix).show(interactive=False, resetcam=True)
         self.plotter.at(MAIN_RENDERER_IX).show(
             camera=deepcopy(self.cam_dict),
-            interactive=True,  # Must be set to True on the last `show` call
+            interactive=False,
             resetcam=False,
         )
 

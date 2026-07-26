@@ -240,14 +240,13 @@ class VtkDebounceScheduler:
             self._timer_id = self._iren.CreateRepeatingTimer(self._period_ms)
 
     def register(self, key: Hashable, callback: Callable[[], None]) -> None:
-        """Register a callback under a key and start the timer if needed.
+        """Register a callback without starting an idle VTK timer.
 
         Args:
             key: Unique hashable key for the callback.
             callback: callback function to invoke when due.
         """
         self._callbacks[key] = callback
-        self.start()
 
     def schedule_once(self, key: Hashable, delay_sec: float) -> None:
         """Schedule a registered callback to run after a delay.
@@ -262,8 +261,14 @@ class VtkDebounceScheduler:
         """
         if key not in self._callbacks:
             raise KeyError("Key not registered with scheduler")
+        if self._period_ms <= 0:
+            # Synchronous mode avoids native timer events in event loops that
+            # process VTK events manually.
+            self._callbacks[key]()
+            return
         now = time.perf_counter()
         self._due[key] = now if delay_sec <= 0 else now + delay_sec
+        self.start()
 
     def cancel(self, key: Hashable) -> None:
         """Cancel a scheduled callback and remove it from the registry.
