@@ -15,6 +15,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+import matplotlib as mpl
 import numpy as np
 import numpy.typing as npt
 from scipy.spatial.transform import Rotation
@@ -22,6 +23,22 @@ from vedo.vtkclasses import vtkRenderWindowInteractor
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Hashable, Iterable
+
+
+def use_headless_matplotlib() -> None:
+    """Switch matplotlib to the non-interactive Agg backend.
+
+    Vedo-based plots rasterize matplotlib figures into `vedo.Image` widgets and
+    never call `plt.show()`, so they have no use for a GUI backend. With one
+    selected, every figure additionally builds a Qt or Tk figure manager, which
+    competes with VTK for the platform event loop. On macOS that is a native
+    crash. Agg produces identical pixels without touching a GUI toolkit.
+
+    Call this from a plot entry point, before any figure is created. It has no
+    effect on plots that genuinely call `plt.show()`, since only the invoked
+    plot runs in a given process.
+    """
+    mpl.use("Agg", force=True)
 
 
 @dataclass

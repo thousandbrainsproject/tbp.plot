@@ -57,6 +57,7 @@ from tbp.interactive.utils import (
     rotate_about_pivot,
     trace_hypothesis_backward,
     trace_hypothesis_forward,
+    use_headless_matplotlib,
 )
 from tbp.interactive.widget_updaters import WidgetUpdater
 from tbp.interactive.widgets import (
@@ -3225,6 +3226,7 @@ def main(experiment_log_dir: str, objects_mesh_dir: str) -> int:
     Returns:
         Exit code.
     """
+    use_headless_matplotlib()
     vedo.settings.enable_default_keyboard_callbacks = False
 
     if not Path(experiment_log_dir).exists():

@@ -39,6 +39,7 @@ from tbp.interactive.topics import TopicMessage, TopicSpec
 from tbp.interactive.utils import (
     Location3D,
     rotate_about_pivot,
+    use_headless_matplotlib,
 )
 from tbp.interactive.widget_updaters import WidgetUpdater
 from tbp.interactive.widgets import (
@@ -1664,6 +1665,7 @@ def main(
     Returns:
         Exit code.
     """
+    use_headless_matplotlib()
     vedo.settings.enable_default_keyboard_callbacks = False
 
     if not Path(experiment_log_dir).exists():
