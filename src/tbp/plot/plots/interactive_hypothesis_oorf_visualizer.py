@@ -39,6 +39,7 @@ from vedo import (
     settings,
 )
 
+from tbp.interactive.utils import run_interactor
 from tbp.plot.plots.interactive_hypothesis_oorf_visualizer_utils.geometry import (
     get_custom_distances,
     rotate_pose_dependent_features,
@@ -328,7 +329,8 @@ class HypothesesOORFVisualizer:
             viewup="y",
             camera={"pos": (0.5, 1.5, 0.5), "focal_point": (0, 1.5, 0)},
         )
-        self.plotter.show(interactive=True)
+        self.plotter.show(interactive=False)
+        run_interactor(self.plotter)
 
     def update_visualization(self, timestep: int) -> None:
         """Update visualization for given timestep."""

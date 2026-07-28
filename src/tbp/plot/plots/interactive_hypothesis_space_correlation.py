@@ -55,6 +55,7 @@ from tbp.interactive.utils import (
     Location2D,
     Location3D,
     rotate_about_pivot,
+    run_interactor,
     trace_hypothesis_backward,
     trace_hypothesis_forward,
     use_headless_matplotlib,
@@ -2977,7 +2978,8 @@ class InteractivePlot:
         self.ycb_loader = YCBMeshLoader(data_path)
         self.event_bus = Publisher()
         self.plotter = Plotter(shape=renderer_areas, sharecam=False).render()
-        self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=33)
+        # period_ms=0: no VTK timer; `run_interactor` polls the scheduler.
+        self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=0)
         self.animator = None
 
         # create and add the widgets to the plotter
@@ -2992,8 +2994,7 @@ class InteractivePlot:
         self.plotter.add_callback("KeyPress", self._on_keypress)
 
         self._setup_renderers()
-
-        # === No code runs after the last interactive call in _setup_renderers() === #
+        run_interactor(self.plotter, self.scheduler)
 
     def _setup_renderers(self) -> None:
         self.plotter.at(SIMULATOR_IX).show(
@@ -3008,7 +3009,7 @@ class InteractivePlot:
         )
         self.plotter.at(MAIN_RENDERER_IX).show(
             camera=deepcopy(self.cam_dict),
-            interactive=True,  # Must be set to True on the last `show` call
+            interactive=False,  # `run_interactor` drives interaction instead
             resetcam=False,
         )
 
