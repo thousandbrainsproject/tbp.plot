@@ -96,6 +96,7 @@ from tbp.interactive.data import (
     DataParser,
     YCBMeshLoader,
 )
+from tbp.interactive.utils import run_interactor
 from tbp.interactive.widgets import (
     VtkDebounceScheduler,
 )
@@ -130,7 +131,8 @@ class InteractivePlot:
         self.ycb_loader = YCBMeshLoader(data_path)
         self.event_bus = Publisher()
         self.plotter = Plotter(shape=renderer_areas, sharecam=False).render()
-        self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=33)
+        # period_ms=0: no VTK timer; `run_interactor` polls the scheduler.
+        self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=0)
 
         # Show the plot renderers
         self.plotter.at(0).show(
@@ -145,9 +147,12 @@ class InteractivePlot:
         )
         self.plotter.at(2).show(
             axes=deepcopy(self.axes_dict),
-            interactive=True,
+            interactive=False,
             resetcam=True,
         )
+
+        # Drive the event loop until the window is closed
+        run_interactor(self.plotter, self.scheduler)
 
 
 @register(
@@ -222,6 +227,8 @@ In later sections, widgets will publish topic messages to this bus and subscribe
 - `VtkDebounceScheduler(plotter, period_ms)` provides a central "debounce" mechanism so widget updates can be throttled.
 Interactive widgets can produce a high volume of callbacks, especially while dragging sliders.
 Throttling with a debounce mechanism ensures the plot updates smoothly and stays responsive, rather than attempting to render computationally intense objects many times in a short period of time.
+We pass `period_ms=0`, which tells the scheduler not to create a VTK timer of its own.
+Instead, the event loop we start at the end of `__init__` calls the scheduler's `poll()` method on every pass, which is where due callbacks fire.
 
 ### Renderers and `Vedo.Plotter`
 
@@ -236,12 +243,11 @@ Finally, we call `.show(...)` on each renderer to initialize them with the right
 
 Even though renderer 0 is mainly used as a UI area (sliders and other widgets), we still call `show()` on it to initialize its viewport and apply a camera configuration; every renderer needs to have a camera to render its widgets.
 Renderers 1 and 2 are intended for 3D content, so we initialize them with axes.
-In Vedo, an important detail is that `show(interactive=True)` starts the interactive event loop and blocks any further execution.
-This means that the script effectively “stops here” and waits for user input, and you typically do not run additional setup code after that call.
 
-For this reason, we call `show(interactive=False)` on renderers 0 and 1 while we are still constructing the full scene.
-These calls set up the renderers without entering the blocking interaction loop.
-Finally, we call `show(interactive=True)` once at the end (i.e., on renderer 2), which starts the event loop and makes the whole window responsive to user interaction, including widgets placed in renderers 0.
+Note that every renderer is shown with `interactive=False`.
+Rather than letting Vedo start its own blocking event loop with `show(interactive=True)`, we initialize all renderers non-interactively and then call `run_interactor(self.plotter, self.scheduler)` once the scene is fully constructed.
+This helper processes VTK events until the window is closed, polls the debounce scheduler on each pass, and closes the plotter on the way out.
+It is the last thing `__init__` does, so no code runs after it.
 
 At this stage, running the plot should open a window with three regions and no widgets, as shown below.
 To run the plot, you can use the command `uv run plot interactive_tutorial /path/to/experiment/logs/dir`
@@ -287,7 +293,7 @@ class InteractivePlot:
         self.ycb_loader = YCBMeshLoader(data_path)
         self.event_bus = Publisher()
         self.plotter = Plotter(shape=renderer_areas, sharecam=False).render()
-        self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=33)
+        self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=0)
 
         # NEW: Create and add widgets
         self._widgets = self.create_widgets()
@@ -297,7 +303,7 @@ class InteractivePlot:
         # NEW: Set an initial value for the episode slider
         self._widgets["episode_slider"].set_state(0)
 
-        # ... same .show(...) calls as Part 1 ...
+        # ... same .show(...) and run_interactor(...) calls as Part 1 ...
 ```
 
 Next, add a `create_widgets()` method to the class.
