@@ -14,7 +14,7 @@ For example, all widgets may choose to add/remove elements to the UI, or they ma
 
 The `Widget` performs several tasks:
 1) **Scheduling of debounced messages.**
-This uses a `VtkDebounceScheduler` to collapse repeated widget state messages within a user-configurable amount of time (`debounce_sec`) and sends only the last message.
+This uses a `DebounceScheduler` to collapse repeated widget state messages within a user-configurable amount of time (`debounce_sec`) and sends only the last message.
 2) **Ability to deduplicate messages.**
 Messages may not be published if the state remains the same, even after UI interaction.
 For example, if a button was pressed a few times and cycles back to the original state.

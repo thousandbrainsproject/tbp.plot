@@ -12,15 +12,13 @@ from __future__ import annotations
 import logging
 import time
 from bisect import bisect_left
-from contextlib import suppress
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import matplotlib as mpl
 import numpy as np
 import numpy.typing as npt
 from scipy.spatial.transform import Rotation
-from vedo.vtkclasses import vtkRenderWindowInteractor
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Hashable, Iterable
@@ -28,10 +26,6 @@ if TYPE_CHECKING:
     from vedo import Plotter
 
 logger = logging.getLogger(__name__)
-
-# Idle time between event-processing passes. Short enough to feel immediate,
-# long enough to keep the loop off a CPU core.
-_INTERACTOR_POLL_SEC = 0.01
 
 
 def use_headless_matplotlib() -> None:
@@ -51,7 +45,9 @@ def use_headless_matplotlib() -> None:
 
 
 def run_interactor(
-    plotter: Plotter, scheduler: VtkDebounceScheduler | None = None
+    plotter: Plotter,
+    scheduler: DebounceScheduler | None = None,
+    poll_sec: float = 0.01,
 ) -> None:
     """Process VTK events until the window closes, then shut down cleanly.
 
@@ -65,8 +61,11 @@ def run_interactor(
     Args:
         plotter: Plotter whose interactor drives the loop. Every renderer must
             already have been shown with `interactive=False`.
-        scheduler: Debounce scheduler to service on each pass. Pass the one
-            built with `period_ms=0` so no VTK timer is involved.
+        scheduler: Debounce scheduler to service on each pass, if the plot has
+            one. Its due callbacks fire from this loop.
+        poll_sec: Idle time in seconds between event-processing passes. Also
+            bounds how late a debounced callback can fire. Lower values feel
+            more responsive at the cost of more idle CPU.
     """
     interactor = plotter.interactor
     if interactor is None:
@@ -80,7 +79,7 @@ def run_interactor(
             interactor.ProcessEvents()
             if scheduler is not None:
                 scheduler.poll()
-            time.sleep(_INTERACTOR_POLL_SEC)
+            time.sleep(poll_sec)
     except KeyboardInterrupt:
         logger.info("Visualization interrupted")
     finally:
@@ -260,8 +259,8 @@ class CoordinateMapper:
         return Location2D(x_gui, y_gui)
 
 
-class VtkDebounceScheduler:
-    """Single repeating VTK timer that services many debounced callbacks.
+class DebounceScheduler:
+    """Registry of debounced callbacks, serviced by an external event loop.
 
     Debouncing restricts how often a function is called by waiting for a specified
     period of inactivity after an event occurs before executing the callback. This
@@ -269,51 +268,23 @@ class VtkDebounceScheduler:
     callback until we stop changing the widget state for some time (i.e.,
     `debounce sec`) to ensure the UI stays responsive.
 
-    The scheduler keeps one repeating VTK timer and a registry of callbacks that
-    are scheduled to run once at or after a given time. Each callback is keyed
-    by a hashable token.
-
-    Constructing with `period_ms=0` disables the VTK timer entirely; the owner
-    is then responsible for calling `poll` regularly, typically from a
-    `run_interactor` loop. Debouncing behaves identically either way.
+    The scheduler holds a registry of callbacks that are scheduled to run once at
+    or after a given time, each keyed by a hashable token. It has no clock of its
+    own: the owner drives it by calling `poll` regularly, which `run_interactor`
+    does on every pass of its event loop.
 
     Attributes:
-        _iren: A `vtkRenderWindowInteractor` object.
-        _period_ms: Timer period in milliseconds.
-        _obs_tag: Observer tag for the registered VTK timer event.
-        _timer_id: VTK timer id.
         _callbacks: Mapping from keys to callbacks.
         _due: Mapping from keys to ready times in seconds.
     """
 
-    def __init__(self, interactor: vtkRenderWindowInteractor, period_ms: int = 33):
-        """Initialize the scheduler.
-
-        Args:
-            interactor: VTK render window interactor.
-            period_ms: Repeating timer period in milliseconds. Pass 0 to skip the
-                VTK timer and drive the scheduler with `poll` instead.
-        """
-        self._iren = interactor
-        self._period_ms = period_ms
-
-        self._obs_tag: int | None = None
-        self._timer_id: int | None = None
+    def __init__(self) -> None:
+        """Initialize the scheduler."""
         self._callbacks: dict[Hashable, Callable[[], None]] = {}
         self._due: dict[Hashable, float] = {}
 
-    def start(self) -> None:
-        """Ensure the repeating timer is running and the observer is set."""
-        if self._obs_tag is None:
-            self._obs_tag = self._iren.AddObserver("TimerEvent", self._on_timer)
-        if self._timer_id is None:
-            self._timer_id = self._iren.CreateRepeatingTimer(self._period_ms)
-
     def register(self, key: Hashable, callback: Callable[[], None]) -> None:
         """Register a callback under a key.
-
-        The timer is not started here, so registering a widget never leaves an
-        idle VTK timer running before anything has been scheduled.
 
         Args:
             key: Unique hashable key for the callback.
@@ -336,8 +307,6 @@ class VtkDebounceScheduler:
             raise KeyError("Key not registered with scheduler")
         now = time.perf_counter()
         self._due[key] = now if delay_sec <= 0 else now + delay_sec
-        if self._period_ms > 0:
-            self.start()
 
     def cancel(self, key: Hashable) -> None:
         """Cancel a scheduled callback and remove it from the registry.
@@ -347,33 +316,17 @@ class VtkDebounceScheduler:
         """
         self._due.pop(key, None)
         self._callbacks.pop(key, None)
-        if not self._callbacks:
-            self._teardown()
 
     def shutdown(self) -> None:
-        """Clear all callbacks and tear down the timer and observer."""
+        """Clear all scheduled and registered callbacks."""
         self._due.clear()
         self._callbacks.clear()
-        self._teardown()
-
-    def _teardown(self) -> None:
-        """Tear down the VTK timer and observer if present."""
-        if self._timer_id is not None:
-            with suppress(Exception):
-                self._iren.DestroyTimer(self._timer_id)
-            self._timer_id = None
-        if self._obs_tag is not None:
-            with suppress(Exception):
-                self._iren.RemoveObserver(self._obs_tag)
-            self._obs_tag = None
 
     def poll(self) -> None:
         """Invoke every callback whose delay has elapsed.
 
-        This is the whole body of the debounce check, exposed so an event loop
-        that processes VTK events manually can drive the scheduler without a
-        VTK timer. Safe to call as often as desired; each due callback fires
-        once because its entry is removed before it runs.
+        Safe to call as often as desired; each due callback fires once because
+        its entry is removed before it runs.
         """
         if not self._due:
             return
@@ -384,15 +337,6 @@ class VtkDebounceScheduler:
             cb = self._callbacks.get(key)
             if cb:
                 cb()
-
-    def _on_timer(self, _obj: Any, _evt: str) -> None:
-        """VTK timer event handler.
-
-        Args:
-            _obj: VTK callback object (i.e., vtkXRenderWindowInteractor).
-            _evt: Event name (e.g., "TimerEvent").
-        """
-        self.poll()
 
 
 def trace_hypothesis_backward(

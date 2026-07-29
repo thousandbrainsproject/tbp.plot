@@ -44,7 +44,7 @@ from tbp.interactive.utils import (
 )
 from tbp.interactive.widget_updaters import WidgetUpdater
 from tbp.interactive.widgets import (
-    VtkDebounceScheduler,
+    DebounceScheduler,
     Widget,
     extract_button_state,
     extract_slider_state,
@@ -1332,7 +1332,7 @@ class ClickWidgetOps:
     def add(self, callback: Callable) -> None:
         """Register mouse callbacks on the plotter.
 
-        Note that this callback makes use of the `VtkDebounceScheduler`
+        Note that this callback makes use of the `DebounceScheduler`
         to publish messages. Storing the callback and triggering it, will
         simulate a UI change on e.g., a button or a slider, which schedules
         a publish. We use this callback because this event is not triggered
@@ -1439,8 +1439,7 @@ class InteractivePlot:
         self.models_loader = PretrainedModelsLoader(models_path)
         self.event_bus = Publisher()
         self.plotter = Plotter(shape=renderer_areas, sharecam=False).render()
-        # period_ms=0: no VTK timer; `run_interactor` polls the scheduler.
-        self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=0)
+        self.scheduler = DebounceScheduler()
         self.animator = None
 
         # create and add the widgets to the plotter

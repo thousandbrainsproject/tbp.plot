@@ -98,7 +98,7 @@ from tbp.interactive.data import (
 )
 from tbp.interactive.utils import run_interactor
 from tbp.interactive.widgets import (
-    VtkDebounceScheduler,
+    DebounceScheduler,
 )
 from tbp.plot.registry import attach_args, register
 from vedo import Plotter
@@ -131,8 +131,7 @@ class InteractivePlot:
         self.ycb_loader = YCBMeshLoader(data_path)
         self.event_bus = Publisher()
         self.plotter = Plotter(shape=renderer_areas, sharecam=False).render()
-        # period_ms=0: no VTK timer; `run_interactor` polls the scheduler.
-        self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=0)
+        self.scheduler = DebounceScheduler()
 
         # Show the plot renderers
         self.plotter.at(0).show(
@@ -224,11 +223,10 @@ We initialize it here so any mesh visualization widget can reuse it.
 - `Publisher()` creates the shared event bus.
 In later sections, widgets will publish topic messages to this bus and subscribe to them through updaters.
 
-- `VtkDebounceScheduler(plotter, period_ms)` provides a central "debounce" mechanism so widget updates can be throttled.
+- `DebounceScheduler()` provides a central "debounce" mechanism so widget updates can be throttled.
 Interactive widgets can produce a high volume of callbacks, especially while dragging sliders.
 Throttling with a debounce mechanism ensures the plot updates smoothly and stays responsive, rather than attempting to render computationally intense objects many times in a short period of time.
-We pass `period_ms=0`, which tells the scheduler not to create a VTK timer of its own.
-Instead, the event loop we start at the end of `__init__` calls the scheduler's `poll()` method on every pass, which is where due callbacks fire.
+The scheduler has no clock of its own; the event loop we start at the end of `__init__` calls its `poll()` method on every pass, which is where due callbacks fire.
 
 ### Renderers and `Vedo.Plotter`
 
@@ -273,7 +271,7 @@ The rest of the file stays the same for now.
 from vedo import Plotter, Slider2D
 
 from tbp.interactive.widgets import (
-    VtkDebounceScheduler,
+    DebounceScheduler,
     Widget,
 )
 ```
@@ -293,7 +291,7 @@ class InteractivePlot:
         self.ycb_loader = YCBMeshLoader(data_path)
         self.event_bus = Publisher()
         self.plotter = Plotter(shape=renderer_areas, sharecam=False).render()
-        self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=0)
+        self.scheduler = DebounceScheduler()
 
         # NEW: Create and add widgets
         self._widgets = self.create_widgets()
