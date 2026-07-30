@@ -28,7 +28,7 @@ If you have `tbp.monty` installed, run the following command:
 python run_parallel.py \
   experiment=randrot_noise_10distinctobj_dist_agent \
   episodes=\'5,9,12\' \
-  +experiment/config/logging=detailed_evidence_lm
+  logging=detailed_info_monty_runs
 ```
 
 This command:
