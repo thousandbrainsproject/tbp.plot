@@ -16,7 +16,7 @@ from vedo import Button, Plotter, Slider2D
 
 from tbp.interactive.events import EventSpec
 from tbp.interactive.topics import TopicMessage, TopicSpec
-from tbp.interactive.utils import VtkDebounceScheduler
+from tbp.interactive.utils import DebounceScheduler
 from tbp.interactive.widget_ops import (
     HasStateToMessages,
     HasUpdaters,
@@ -118,8 +118,8 @@ class Widget[WidgetT, StateT]:
     The widget is created via `widget_ops.add` and removed via
     `widget_ops.remove`. State reads and writes are delegated to
     `widget_ops`. This wrapper implements Debounce logic through the
-    `VtkDebounceScheduler`, which runs a timer in the background effectively
-    collapsing rapid changes in widget states.
+    `DebounceScheduler`, which defers due callbacks to the event loop,
+    effectively collapsing rapid changes in widget states.
 
     Attributes:
         bus: Pubsub bus used to send messages.
@@ -149,7 +149,7 @@ class Widget[WidgetT, StateT]:
         ),
         scopes: list[int] | None,
         bus: Publisher,
-        scheduler: VtkDebounceScheduler,
+        scheduler: DebounceScheduler,
         debounce_sec: float = 0.25,
         dedupe: bool = True,
     ):
