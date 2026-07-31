@@ -28,7 +28,7 @@ If you have `tbp.monty` installed, run the following command:
 python run_parallel.py \
   experiment=randrot_noise_10distinctobj_dist_agent \
   episodes=\'5,9,12\' \
-  +experiment/config/logging=detailed_evidence_lm
+  logging=detailed_info_evidence_eval_runs
 ```
 
 This command:
@@ -37,10 +37,10 @@ This command:
     - 5 (mustard bottle)
     - 9 (banana)
     - 12 (potted meat can)
-- overrides the experiment logging config to `detailed_evidence_lm`, which enables the detailed JSON logging handler.
+- overrides the experiment logging config to `detailed_info_evidence_eval_runs`, which enables the detailed JSON logging handler.
 
 The experiment writes its outputs into the configured logging output directory.
-If you are using the `detailed_evidence_lm` config shown earlier, the [output directory](https://github.com/thousandbrainsproject/tbp.monty/blob/e7006fab6d05b8424b530eeefc8e4132bdddb8ab/conf/experiment/config/logging/detailed_evidence_lm.yaml?plain=1#L10) will be at:
+If you are using the `detailed_info_evidence_eval_runs` config shown earlier, the [output directory](https://github.com/thousandbrainsproject/tbp.monty/blob/0050f445a063d44b2e05cb760c6c1837106ca8d7/src/tbp/monty/conf/logging/detailed_info_evidence_eval_runs.yaml?plain=1#L11) will be at:
 ```yaml
 output_dir: ${oc.env:MONTY_LOGS}/projects/evidence_eval_runs/logs
 ```
