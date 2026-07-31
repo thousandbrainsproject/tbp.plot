@@ -9,14 +9,12 @@
 import unittest
 from unittest.mock import patch
 
-from vtk import vtkRenderWindowInteractor
-
 from tbp.interactive.animator import (
     WidgetAction,
     WidgetAnimator,
     make_slider_step_actions_for_widget,
 )
-from tbp.interactive.utils import VtkDebounceScheduler
+from tbp.interactive.utils import DebounceScheduler
 
 
 class FakeWidget:
@@ -31,12 +29,11 @@ class FakeWidget:
 
 class TestWidgetAnimator(unittest.TestCase):
     def setUp(self) -> None:
-        self.iren = vtkRenderWindowInteractor()
-        self.scheduler = VtkDebounceScheduler(self.iren, period_ms=33)
+        self.scheduler = DebounceScheduler()
 
     def _tick_scheduler(self) -> None:
-        """Manually tick the scheduler once (simulate a timer event)."""
-        self.scheduler._on_timer(None, "TimerEvent")
+        """Manually service the scheduler once (simulate one event-loop pass)."""
+        self.scheduler.poll()
 
     def test_start_no_actions_is_noop(self) -> None:
         animator = WidgetAnimator(self.scheduler, actions=[], key_prefix="k")
@@ -179,8 +176,7 @@ class TestMakeSliderStepActions(unittest.TestCase):
         self.assertEqual(widget.values, [10.0, 15.0, 20.0])
 
     def test_integration_animator_executes_slider_actions_in_time_order(self) -> None:
-        iren = vtkRenderWindowInteractor()
-        scheduler = VtkDebounceScheduler(iren, period_ms=33)
+        scheduler = DebounceScheduler()
 
         widget = FakeWidget()
         actions = make_slider_step_actions_for_widget(
@@ -197,22 +193,22 @@ class TestMakeSliderStepActions(unittest.TestCase):
 
         # t=0.0 -> first should fire
         with patch("time.perf_counter", lambda: 0.0):
-            scheduler._on_timer(None, "TimerEvent")
+            scheduler.poll()
         self.assertEqual(widget.values, [0.0])
 
         # t=0.49 -> none
         with patch("time.perf_counter", lambda: 0.49):
-            scheduler._on_timer(None, "TimerEvent")
+            scheduler.poll()
         self.assertEqual(widget.values, [0.0])
 
         # t=0.51 -> second
         with patch("time.perf_counter", lambda: 0.51):
-            scheduler._on_timer(None, "TimerEvent")
+            scheduler.poll()
         self.assertEqual(widget.values, [0.0, 0.5])
 
         # t=1.01 -> third
         with patch("time.perf_counter", lambda: 1.01):
-            scheduler._on_timer(None, "TimerEvent")
+            scheduler.poll()
         self.assertEqual(widget.values, [0.0, 0.5, 1.0])
 
     def test_values_parameter_creates_actions_for_each_value(self) -> None:

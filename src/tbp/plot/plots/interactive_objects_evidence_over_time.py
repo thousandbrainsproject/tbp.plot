@@ -28,6 +28,7 @@ from vedo import (
     settings,
 )
 
+from tbp.interactive.utils import run_interactor
 from tbp.plot.plots.stats import deserialize_json_chunks
 from tbp.plot.registry import attach_args, register
 
@@ -704,7 +705,7 @@ class InteractivePlot:
             axes=self.evidence_plotter.axes_dict(),
             camera=self.evidence_plotter.cam_dict(),
             resetcam=False,
-            interactive=True,
+            interactive=False,  # `run_interactor` drives interaction instead
         )
 
 
@@ -736,6 +737,7 @@ def main(experiment_log_dir: str, objects_mesh_dir: str, learning_module: str) -
 
     plot = InteractivePlot(experiment_log_dir, data_path, learning_module)
     plot.render(resetcam=True)
+    run_interactor(plot.plotter)
 
     return 0
 

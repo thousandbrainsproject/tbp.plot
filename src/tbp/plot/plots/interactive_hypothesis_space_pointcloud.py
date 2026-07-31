@@ -39,10 +39,12 @@ from tbp.interactive.topics import TopicMessage, TopicSpec
 from tbp.interactive.utils import (
     Location3D,
     rotate_about_pivot,
+    run_interactor,
+    use_headless_matplotlib,
 )
 from tbp.interactive.widget_updaters import WidgetUpdater
 from tbp.interactive.widgets import (
-    VtkDebounceScheduler,
+    DebounceScheduler,
     Widget,
     extract_button_state,
     extract_slider_state,
@@ -1330,7 +1332,7 @@ class ClickWidgetOps:
     def add(self, callback: Callable) -> None:
         """Register mouse callbacks on the plotter.
 
-        Note that this callback makes use of the `VtkDebounceScheduler`
+        Note that this callback makes use of the `DebounceScheduler`
         to publish messages. Storing the callback and triggering it, will
         simulate a UI change on e.g., a button or a slider, which schedules
         a publish. We use this callback because this event is not triggered
@@ -1437,7 +1439,7 @@ class InteractivePlot:
         self.models_loader = PretrainedModelsLoader(models_path)
         self.event_bus = Publisher()
         self.plotter = Plotter(shape=renderer_areas, sharecam=False).render()
-        self.scheduler = VtkDebounceScheduler(self.plotter.interactor, period_ms=33)
+        self.scheduler = DebounceScheduler()
         self.animator = None
 
         # create and add the widgets to the plotter
@@ -1455,8 +1457,7 @@ class InteractivePlot:
         self.plotter.add_callback("KeyPress", self._on_keypress)
 
         self._setup_renderers()
-
-        # === No code runs after the last interactive call in _setup_renderers() === #
+        run_interactor(self.plotter, self.scheduler)
 
     def _setup_renderers(self) -> None:
         self.plotter.at(SIMULATOR_IX).show(
@@ -1471,7 +1472,7 @@ class InteractivePlot:
         )
         self.plotter.at(MAIN_RENDERER_IX).show(
             camera=deepcopy(self.cam_dict),
-            interactive=True,  # Must be set to True on the last `show` call
+            interactive=False,  # `run_interactor` drives interaction instead
             resetcam=False,
         )
 
@@ -1664,6 +1665,7 @@ def main(
     Returns:
         Exit code.
     """
+    use_headless_matplotlib()
     vedo.settings.enable_default_keyboard_callbacks = False
 
     if not Path(experiment_log_dir).exists():

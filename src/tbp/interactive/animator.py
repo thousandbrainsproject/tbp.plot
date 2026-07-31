@@ -10,7 +10,7 @@
 from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 
-from tbp.interactive.utils import VtkDebounceScheduler
+from tbp.interactive.utils import DebounceScheduler
 
 
 @dataclass
@@ -39,13 +39,13 @@ class WidgetAnimator:
     """Animate widget state changes using an existing VTK debounce scheduler.
 
     This class drives scripted widget interactions by scheduling `WidgetAction`
-    callables through a shared `VtkDebounceScheduler`. Each action is executed
+    callables through a shared `DebounceScheduler`. Each action is executed
     once at a specified time offset, allowing the visualization to behave as if
     a user were manually interacting with widgets (e.g., sliders or buttons)
     in a smooth, reproducible manner.
 
     Args:
-        scheduler: A `VtkDebounceScheduler` instance used to schedule animation
+        scheduler: A `DebounceScheduler` instance used to schedule animation
             callbacks within the VTK event loop.
         actions: A sequence of time-stamped actions to execute. Actions are sorted
             by their `time` attribute before scheduling.
@@ -61,7 +61,7 @@ class WidgetAnimator:
 
     def __init__(
         self,
-        scheduler: VtkDebounceScheduler,
+        scheduler: DebounceScheduler,
         actions: list[WidgetAction],
         key_prefix: Hashable = "widget_animator",
     ) -> None:
