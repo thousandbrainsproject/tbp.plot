@@ -126,7 +126,7 @@ class DataExtractor:
             self.primary_target_objects.append(
                 episode_data["target"]["primary_target_object"]
             )
-            self.patch_locations.extend(episode_data[self.lm]["locations"]["patch"])
+            self.patch_locations.extend(episode_data[self.lm]["locations"])
 
             for ts, evidence_data in enumerate(episode_data[self.lm]["max_evidence"]):
                 # Max evidence scores

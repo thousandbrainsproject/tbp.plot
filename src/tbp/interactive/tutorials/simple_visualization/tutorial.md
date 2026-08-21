@@ -719,7 +719,6 @@ class GtMeshWidgetOps:
                 DataLocatorStep.key(name="episode"),
                 DataLocatorStep.key(name="system", value="LM_0"),
                 DataLocatorStep.key(name="telemetry", value="locations"),
-                DataLocatorStep.key(name="sm", value="patch"),
                 DataLocatorStep.index(name="step"),
             ]
         )
